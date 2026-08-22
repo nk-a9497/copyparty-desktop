@@ -19,6 +19,7 @@
 #include "common/syncjournaldb.h"
 #include "common/syncjournalfilerecord.h"
 #include "common/utility.h"
+#include "copyparty.h"
 #include "discoveryphase.h"
 #include "filesystem.h"
 #include "propagatedownload.h"
@@ -296,6 +297,9 @@ PropagateItemJob *OwncloudPropagator::createJob(const SyncFileItemPtr &item)
 {
     qCDebug(lcPropagator) << u"Propagating:" << item;
     const bool deleteExisting = item->instruction() == CSYNC_INSTRUCTION_TYPE_CHANGE;
+    // copyparty versions a plain PUT on an existing path instead of overwriting it;
+    // the reliable overwrite is DELETE then PUT, so always delete first in copyparty mode
+    const bool deleteThenPut = deleteExisting || Copyparty::isEnabled();
     switch (item->instruction()) {
     case CSYNC_INSTRUCTION_REMOVE:
         if (item->_direction == SyncFileItem::Down) {
@@ -330,7 +334,7 @@ PropagateItemJob *OwncloudPropagator::createJob(const SyncFileItemPtr &item)
             } else {
                 job = new PropagateUploadFileV1(this, item);
             }
-            job->setDeleteExisting(deleteExisting);
+            job->setDeleteExisting(deleteThenPut);
             return job;
         }
     case CSYNC_INSTRUCTION_RENAME:
