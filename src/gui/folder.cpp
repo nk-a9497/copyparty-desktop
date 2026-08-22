@@ -223,7 +223,7 @@ SyncOptions Folder::loadSyncOptions()
     // account is currently a shared ptr and thus the lifetime of the account object is guaranteed
     opt._parallelNetworkJobs = [account = _accountState->account()] {
         if (Copyparty::isEnabled())
-            return 4; // copyparty servers/proxies stop accepting HTTP/2 streams if we send too many in parallel
+            return 8; // copyparty servers/proxies stop accepting HTTP/2 streams if we send too many in parallel
         return account->isHttp2Supported() ? 20 : 6;
     };
 

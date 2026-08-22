@@ -30,6 +30,7 @@
 #include "gui/networkinformation.h"
 #include "gui/settingsdialog.h"
 #include "gui/tlserrordialog.h"
+#include "scheduling/syncscheduler.h"
 
 #include "logger.h"
 #include "socketapi/socketapi.h"
@@ -306,6 +307,16 @@ void AccountState::checkConnectivity(bool blockJobs)
 {
     if (isSignedOut() || _waitingForNewCredentials) {
         return;
+    }
+    // copyparty has no per-folder etags, so every sync walks the whole tree; during that
+    // long discovery the periodic WebDAV-root probe below can be starved and falsely flip
+    // the account to Disconnected, aborting the sync. If we are already Connected and a
+    // sync for this account is actively running, the sync's own PROPFINDs are proof of
+    // connectivity, so skip the re-validation.
+    if (Copyparty::isEnabled() && _state == Connected) {
+        if (auto *cur = FolderMan::instance()->scheduler()->currentSync(); cur && cur->accountState() == this) {
+            return;
+        }
     }
     qCInfo(lcAccountState) << u"checkConnectivity blocking:" << blockJobs << account()->displayNameWithHost();
     if (_state != Connected) {
