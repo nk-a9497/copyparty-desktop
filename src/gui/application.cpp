@@ -32,6 +32,7 @@
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "gui/systray.h"
+#include "libsync/copyparty.h"
 #include "libsync/creds/credentialmanager.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
@@ -81,6 +82,12 @@ void setUpInitialSyncFolder(AccountStatePtr accountStatePtr, bool useVfs)
             auto spaces = accountStatePtr->account()->spacesManager()->spaces();
             // we do not want to set up folder sync connections for disabled spaces (#10173)
             spaces.erase(std::remove_if(spaces.begin(), spaces.end(), [](auto *space) { return space->disabled(); }), spaces.end());
+
+            // copyparty: don't auto-create a sync folder for the whole root. The user picks
+            // what to sync (on-demand) instead of forcing a full download of everything.
+            if (Copyparty::isEnabled()) {
+                return;
+            }
 
             if (!spaces.isEmpty()) {
                 const QString localDir(accountStatePtr->account()->defaultSyncRoot());

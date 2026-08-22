@@ -22,6 +22,7 @@
 #include <OAIDrive.h>
 #include <OAIDriveItem.h>
 
+#include <QJsonObject>
 #include <QTimer>
 
 #include <chrono>
@@ -53,14 +54,11 @@ SpacesManager::SpacesManager(Account *parent)
 void SpacesManager::refresh()
 {
     if (!OC_ENSURE(_account->accessManager())) {
-        qWarning() << "COPPYPARTY spaces: refresh skipped, no accessManager";
         return;
     }
     if (!_account->credentials()->ready()) {
-        qWarning() << "COPPYPARTY spaces: refresh skipped, creds not ready";
         return;
     }
-    qWarning() << "COPPYPARTY spaces: refresh running, copyparty=" << Copyparty::isEnabled();
 
     if (Copyparty::isEnabled()) {
         // copyparty has no spaces / graph API (returns 404). Present the WebDAV root
@@ -69,10 +67,12 @@ void SpacesManager::refresh()
         auto *space = this->space(QLatin1String(rootSpaceId));
         if (!space) {
             OpenAPI::OAIDrive drive;
+            drive.fromJsonObject(QJsonObject{});
             drive.setId(QLatin1String(rootSpaceId));
             drive.setName(QStringLiteral("copyparty"));
             drive.setDriveType(QStringLiteral("project"));
             OpenAPI::OAIDriveItem root;
+            root.fromJsonObject(QJsonObject{});
             root.setId(QLatin1String("root"));
             root.setName(QStringLiteral("copyparty"));
             root.setWebDavUrl(_account->url().toString());
@@ -86,7 +86,6 @@ void SpacesManager::refresh()
             _ready = true;
             Q_EMIT ready();
         }
-        qWarning() << "COPPYPARTY spaces: synthesized, count=" << _spacesMap.size();
         Q_EMIT updated();
         _refreshTimer->start();
         return;
