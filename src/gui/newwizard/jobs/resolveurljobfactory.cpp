@@ -112,6 +112,13 @@ CoreJob *ResolveUrlJobFactory::startJob(const QUrl &url, QObject *parent)
     QObject::connect(job->reply(), &QNetworkReply::finished, job, makeFinishedHandler(job->reply()));
 
     QObject::connect(job->reply(), &QNetworkReply::sslErrors, job, [req, job, makeFinishedHandler, nam = nam()](const QList<QSslError> &errors) mutable {
+        // copyparty servers commonly use self-signed / untrusted certificates; accept
+        // them so server detection can proceed instead of aborting on the TLS error
+        if (Copyparty::isEnabled()) {
+            job->reply()->ignoreSslErrors(errors);
+            return;
+        }
+
         // the tls error dialog can only handle untrusted certificates not general ssl errors
         auto filtered = errors;
         filtered.erase(std::remove_if(filtered.begin(), filtered.end(), [](const QSslError &e) { return e.certificate().isNull(); }), filtered.end());
