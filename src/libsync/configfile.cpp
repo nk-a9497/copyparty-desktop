@@ -362,6 +362,24 @@ void ConfigFile::setUiLanguage(const QString &uiLanguage)
     settings.setValue(uiLanguageC(), uiLanguage);
 }
 
+QString ConfigFile::copypartyChangesCursor(const QUuid &accountUuid) const
+{
+    auto settings = makeQSettings();
+    settings.beginGroup(QStringLiteral("copyparty"));
+    const auto value = settings.value(QStringLiteral("changesCursor/") + accountUuid.toString(QUuid::WithoutBraces)).toString();
+    settings.endGroup();
+    return value;
+}
+
+void ConfigFile::setCopypartyChangesCursor(const QUuid &accountUuid, const QString &cursor)
+{
+    auto settings = makeQSettings();
+    settings.beginGroup(QStringLiteral("copyparty"));
+    settings.setValue(QStringLiteral("changesCursor/") + accountUuid.toString(QUuid::WithoutBraces), cursor);
+    settings.endGroup();
+    settings.sync();
+}
+
 void ConfigFile::setProxyType(QNetworkProxy::ProxyType proxyType, const QString &host, int port, bool needsAuth, const QString &user)
 {
     auto settings = makeQSettings();

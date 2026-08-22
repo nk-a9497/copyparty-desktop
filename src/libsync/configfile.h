@@ -20,6 +20,7 @@
 #include <QNetworkProxy>
 #include <QSettings>
 #include <QString>
+#include <QUuid>
 #include <QVariant>
 
 #include <chrono>
@@ -150,6 +151,10 @@ public:
 
     QString uiLanguage() const;
     void setUiLanguage(const QString &uiLanguage);
+
+    /// Last change-notification cursor for a copyparty account (Tier-2 delta API).
+    QString copypartyChangesCursor(const QUuid &accountUuid) const;
+    void setCopypartyChangesCursor(const QUuid &accountUuid, const QString &cursor);
 
     void saveGeometryHeader(QHeaderView *header);
     bool restoreGeometryHeader(QHeaderView *header);

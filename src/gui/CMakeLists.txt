@@ -40,6 +40,7 @@ target_sources(OpenCloudGui PRIVATE
     clientproxy.cpp
     commonstrings.cpp
     connectionvalidator.cpp
+    copypartychangeswatcher.cpp
     folder.cpp
     folderdefinition.cpp
     folderman.cpp

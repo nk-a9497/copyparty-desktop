@@ -26,12 +26,14 @@
 #include "gui/aboutdialog.h"
 #include "gui/accountsettings.h"
 #include "gui/clientproxy.h"
+#include "gui/copypartychangeswatcher.h"
 #include "gui/fetchserversettings.h"
 #include "gui/folderwizard/folderwizard.h"
 #include "gui/newwizard/setupwizardcontroller.h"
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "gui/systray.h"
+#include "libsync/copyparty.h"
 #include "libsync/creds/credentialmanager.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
@@ -218,6 +220,11 @@ void Application::slotAccountStateAdded(AccountStatePtr accountState) const
     connect(accountState->account().data(), &Account::serverVersionChanged, FolderMan::instance(),
         [account = accountState->account().data()] { FolderMan::instance()->slotServerVersionChanged(account); });
     accountState->checkConnectivity();
+
+    if (Copyparty::isEnabled()) {
+        // watch copyparty's server-side change notifications and re-sync when files change
+        new CopypartyChangesWatcher(accountState, accountState.data());
+    }
 }
 
 void Application::slotCleanup()
