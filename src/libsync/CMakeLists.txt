@@ -28,7 +28,7 @@ add_library(libsync SHARED
     abstractnetworkjob.cpp
     networkjobs.cpp
     owncloudpropagator.cpp
-    opencloudtheme.cpp
+    copypartytheme.cpp
     platform.cpp
     progressdispatcher.cpp
     propagatorjobs.cpp

@@ -12,7 +12,7 @@
  * for more details.
  */
 
-#include "opencloudtheme.h"
+#include "copypartytheme.h"
 
 #include <QCoreApplication>
 #include <QIcon>
@@ -21,32 +21,32 @@
 
 namespace OCC {
 
-OpenCloudTheme::OpenCloudTheme()
+CopypartyTheme::CopypartyTheme()
     : Theme()
 {
 }
 
-QColor OpenCloudTheme::wizardHeaderBackgroundColor() const
+QColor CopypartyTheme::wizardHeaderBackgroundColor() const
 {
     return QColor("#20434F");
 }
 
-QColor OpenCloudTheme::wizardHeaderTitleColor() const
+QColor CopypartyTheme::wizardHeaderTitleColor() const
 {
     return Qt::white;
 }
 
-QIcon OpenCloudTheme::wizardHeaderLogo() const
+QIcon CopypartyTheme::wizardHeaderLogo() const
 {
     return Resources::themeUniversalIcon(QStringLiteral("wizard_logo"));
 }
 
-QmlButtonColor OpenCloudTheme::primaryButtonColor() const
+QmlButtonColor CopypartyTheme::primaryButtonColor() const
 {
     return {"#E2BAFF", "#19353F", "#DADADA"};
 }
 
-QmlButtonColor OpenCloudTheme::secondaryButtonColor() const
+QmlButtonColor CopypartyTheme::secondaryButtonColor() const
 {
     return {"#CA8DF5", "#19353F", "#B0B0B0"};
 }

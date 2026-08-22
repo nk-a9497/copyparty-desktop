@@ -15,8 +15,8 @@ endif()
 # TODO: re enable once we got icons
 #set( MAC_INSTALLER_BACKGROUND_FILE "${CMAKE_SOURCE_DIR}/admin/osx/installer-background.png")
 
-set( THEME_CLASS            "OpenCloudTheme" )
+set( THEME_CLASS            "CopypartyTheme" )
 
-set( THEME_INCLUDE          "opencloudtheme.h" )
+set( THEME_INCLUDE          "copypartytheme.h" )
 
 option( WITH_CRASHREPORTER "Build crashreporter" OFF )

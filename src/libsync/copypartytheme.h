@@ -17,11 +17,11 @@
 
 namespace OCC {
 
-class OpenCloudTheme : public Theme
+class CopypartyTheme : public Theme
 {
     Q_OBJECT
 public:
-    OpenCloudTheme();
+    CopypartyTheme();
     QColor wizardHeaderBackgroundColor() const override;
     QColor wizardHeaderTitleColor() const override;
     QIcon wizardHeaderLogo() const override;
