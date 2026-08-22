@@ -66,6 +66,8 @@ void SetupWizardAccountBuilder::setServerUrl(const QUrl &serverUrl)
     // to not keep credentials longer than necessary, we purge them whenever the URL is set
     // for this reason, we also don't insert already-known credentials on the credentials pages when switching to them
     _authenticationStrategy.reset();
+    _basicUser.clear();
+    _basicPassword.clear();
 }
 
 QUrl SetupWizardAccountBuilder::serverUrl() const
@@ -87,10 +89,17 @@ AccountPtr SetupWizardAccountBuilder::build() const
 
     Q_ASSERT(hasValidCredentials());
 
-    // TODO: perhaps _authenticationStrategy->setUpAccountPtr(...) would be more elegant? no need for getters then
-    newAccountPtr->setCredentials(_authenticationStrategy->makeCreds());
-    newAccountPtr->credentials()->persist();
-    OAuth::persist(newAccountPtr, _authenticationStrategy->dynamicRegistrationData(), _authenticationStrategy->idToken());
+    if (hasBasicAuthentication()) {
+        // HTTP Basic auth (plain WebDAV, e.g. copyparty) - no OAuth flow
+        auto *creds = new HttpCredentialsGui(_basicUser, _basicPassword);
+        newAccountPtr->setCredentials(creds);
+        creds->persist();
+    } else {
+        // TODO: perhaps _authenticationStrategy->setUpAccountPtr(...) would be more elegant? no need for getters then
+        newAccountPtr->setCredentials(_authenticationStrategy->makeCreds());
+        newAccountPtr->credentials()->persist();
+        OAuth::persist(newAccountPtr, _authenticationStrategy->dynamicRegistrationData(), _authenticationStrategy->idToken());
+    }
 
     newAccountPtr->setDavDisplayName(_displayName);
 
@@ -107,8 +116,25 @@ AccountPtr SetupWizardAccountBuilder::build() const
     return newAccountPtr;
 }
 
+void SetupWizardAccountBuilder::setBasicAuthentication(const QString &user, const QString &password)
+{
+    _basicUser = user;
+    _basicPassword = password;
+    // Basic and OAuth credentials are mutually exclusive
+    _authenticationStrategy.reset();
+}
+
+bool SetupWizardAccountBuilder::hasBasicAuthentication() const
+{
+    return !_basicUser.isEmpty() && !_basicPassword.isEmpty();
+}
+
 bool SetupWizardAccountBuilder::hasValidCredentials() const
 {
+    if (hasBasicAuthentication()) {
+        return true;
+    }
+
     if (_authenticationStrategy == nullptr) {
         return false;
     }

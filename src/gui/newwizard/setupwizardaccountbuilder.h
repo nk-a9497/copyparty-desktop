@@ -66,6 +66,16 @@ public:
     OAuth2AuthenticationStrategy *authenticationStrategy() const;
 
     /**
+     * Set HTTP Basic credentials (used for plain WebDAV servers such as copyparty).
+     */
+    void setBasicAuthentication(const QString &user, const QString &password);
+
+    /**
+     * Whether HTTP Basic credentials are set.
+     */
+    bool hasBasicAuthentication() const;
+
+    /**
      * Check whether credentials passed to the builder so far can be used to create a new account object.
      * Note that this does not mean they are correct, the method only checks whether there is "enough" data.
      * @return true if credentials are valid, false otherwise
@@ -108,6 +118,9 @@ private:
     QUrl _webFingerSelectedInstance;
 
     std::unique_ptr<OAuth2AuthenticationStrategy> _authenticationStrategy;
+
+    QString _basicUser;
+    QString _basicPassword;
 
     QString _displayName;
 

@@ -60,7 +60,11 @@ protected:
     {
         QNetworkRequest req(request);
         if (!req.attribute(HttpCredentials::DontAddCredentialsAttribute).toBool()) {
-            if (_cred && !_cred->_accessToken.isEmpty()) {
+            if (_cred && !_cred->_user.isEmpty() && !_cred->_password.isEmpty()) {
+                // HTTP Basic auth (plain WebDAV, e.g. copyparty)
+                const QByteArray auth = _cred->_user.toUtf8() + ':' + _cred->_password.toUtf8();
+                req.setRawHeader("Authorization", "Basic " + auth.toBase64());
+            } else if (_cred && !_cred->_accessToken.isEmpty()) {
                 req.setRawHeader("Authorization", "Bearer " + _cred->_accessToken.toUtf8());
             }
         }
@@ -79,6 +83,13 @@ HttpCredentials::HttpCredentials(const QString &accessToken)
 {
 }
 
+HttpCredentials::HttpCredentials(const QString &user, const QString &password)
+    : _user(user)
+    , _password(password)
+    , _ready(true)
+{
+}
+
 AccessManager *HttpCredentials::createAM() const
 {
     AccessManager *am = new HttpCredentialsAccessManager(this);
@@ -92,6 +103,21 @@ AccessManager *HttpCredentials::createAM() const
 bool HttpCredentials::ready() const
 {
     return _ready;
+}
+
+bool HttpCredentials::hasBasicAuth() const
+{
+    return !_user.isEmpty() && !_password.isEmpty();
+}
+
+QString HttpCredentials::user() const
+{
+    return _user;
+}
+
+QString HttpCredentials::password() const
+{
+    return _password;
 }
 
 void HttpCredentials::fetchFromKeychain()
@@ -114,31 +140,45 @@ void HttpCredentials::fetchFromKeychain()
 
 void HttpCredentials::fetchFromKeychainHelper()
 {
+    // Prefer OAuth refresh token if present, otherwise fall back to HTTP Basic credentials.
     auto job = _account->credentialManager()->get(refreshTokenKeyC());
     connect(job, &CredentialJob::finished, this, [job, this] {
-        auto handleError = [job, this] {
-            qCWarning(lcHttpCredentials) << u"Could not retrieve client password from keychain" << job->errorString();
+        if (job->error() == QKeychain::NoError) {
+            const auto data = job->data().toString();
+            if (!data.isEmpty()) {
+                _refreshToken = data;
+                refreshAccessToken();
+                return;
+            }
+        }
+        loadBasicFromKeychain();
+    });
+}
 
-            // we come here if the password is empty or any other keychain
-            // error happend.
-
+void HttpCredentials::loadBasicFromKeychain()
+{
+    auto job = _account->credentialManager()->get(QStringLiteral("http/user"));
+    connect(job, &CredentialJob::finished, this, [job, this] {
+        if (job->error() != QKeychain::NoError) {
             _fetchErrorString = job->error() != QKeychain::EntryNotFound ? job->errorString() : QString();
-
-            _accessToken.clear();
             _ready = false;
             Q_EMIT fetched();
-        };
-        if (job->error() != QKeychain::NoError) {
-            handleError();
             return;
         }
-        const auto data = job->data().toString();
-        if (OC_ENSURE(!data.isEmpty())) {
-            _refreshToken = data;
-            refreshAccessToken();
-        } else {
-            handleError();
-        }
+        _user = job->data().toString();
+
+        auto pwdJob = _account->credentialManager()->get(QStringLiteral("http/password"));
+        connect(pwdJob, &CredentialJob::finished, this, [pwdJob, this] {
+            if (pwdJob->error() != QKeychain::NoError) {
+                _fetchErrorString = pwdJob->error() != QKeychain::EntryNotFound ? pwdJob->errorString() : QString();
+                _ready = false;
+                Q_EMIT fetched();
+                return;
+            }
+            _password = pwdJob->data().toString();
+            _ready = !_user.isEmpty() && !_password.isEmpty();
+            Q_EMIT fetched();
+        });
     });
 }
 
@@ -162,6 +202,12 @@ void HttpCredentials::slotAuthentication(QNetworkReply *reply, QAuthenticator *a
     // Thus, if we reach this signal, those credentials were invalid and we terminate.
     qCWarning(lcHttpCredentials) << u"Stop request: Authentication failed for " << reply->url().toString() << reply->request().rawHeader("Original-Request-ID");
     reply->setProperty(authenticationFailedC, true);
+
+    if (hasBasicAuth()) {
+        // HTTP Basic credentials were rejected by the server - no token to refresh.
+        Q_EMIT authenticationFailed();
+        return;
+    }
 
     if (!_oAuthJob) {
         qCInfo(lcHttpCredentials) << u"Refreshing token";
@@ -277,6 +323,8 @@ void HttpCredentials::invalidateToken()
         _previousPassword = _accessToken;
     }
     _accessToken = QString();
+    _user = QString();
+    _password = QString();
     _ready = false;
 
     // clear the session cookie.
@@ -309,6 +357,12 @@ void HttpCredentials::forgetSensitiveData()
 void HttpCredentials::persist()
 {
     // write secrets to the keychain
+    if (hasBasicAuth()) {
+        // HTTP Basic credentials (plain WebDAV, e.g. copyparty)
+        _account->credentialManager()->set(QStringLiteral("http/user"), _user);
+        _account->credentialManager()->set(QStringLiteral("http/password"), _password);
+        return;
+    }
     // _refreshToken should only be empty when we are logged out...
     if (!_refreshToken.isEmpty()) {
         _account->credentialManager()->set(refreshTokenKeyC(), _refreshToken);

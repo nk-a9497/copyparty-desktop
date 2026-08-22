@@ -35,6 +35,9 @@ public:
 
     HttpCredentialsGui(const QString &accessToken, const QString &refreshToken);
 
+    /// HTTP Basic auth variant (used for plain WebDAV servers such as copyparty)
+    HttpCredentialsGui(const QString &user, const QString &password);
+
     void restartOauth() override;
 
 

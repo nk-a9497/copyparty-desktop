@@ -5,8 +5,10 @@
 #include "pages/accountconfiguredwizardpage.h"
 #include "states/abstractsetupwizardstate.h"
 #include "states/accountconfiguredsetupwizardstate.h"
+#include "states/basiccredentialssetupwizardstate.h"
 #include "states/oauthcredentialssetupwizardstate.h"
 #include "states/serverurlsetupwizardstate.h"
+#include "libsync/copyparty.h"
 #include "theme.h"
 
 using namespace std::chrono_literals;
@@ -102,7 +104,12 @@ void SetupWizardController::changeStateTo(SetupWizardState nextState, ChangeReas
         break;
     }
     case SetupWizardState::CredentialsState:
-        _currentState = new OAuthCredentialsSetupWizardState(_context);
+        if (Copyparty::isEnabled()) {
+            // plain WebDAV / copyparty: HTTP Basic credentials instead of the OAuth login flow
+            _currentState = new BasicCredentialsSetupWizardState(_context);
+        } else {
+            _currentState = new OAuthCredentialsSetupWizardState(_context);
+        }
         break;
     case SetupWizardState::AccountConfiguredState: {
         _currentState = new AccountConfiguredSetupWizardState(_context);
@@ -136,6 +143,12 @@ void SetupWizardController::changeStateTo(SetupWizardState nextState, ChangeReas
             return;
         }
         case SetupWizardState::CredentialsState: {
+            if (Copyparty::isEnabled()) {
+                // copyparty has no user-info endpoint; the account will fall back to showing the server URL
+                changeStateTo(SetupWizardState::AccountConfiguredState);
+                return;
+            }
+
             // for now, we assume there is only a single instance
             const auto webFingerInstances = _context->accountBuilder().webFingerInstances();
             if (!webFingerInstances.isEmpty()) {

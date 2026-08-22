@@ -12,6 +12,7 @@ add_library(libsync SHARED
     account.cpp
     bandwidthmanager.cpp
     capabilities.cpp
+    copyparty.cpp
     cookiejar.cpp
     discovery.cpp
     discoveryinfo.cpp

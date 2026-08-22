@@ -19,6 +19,7 @@
 #include "gui/networkinformation.h"
 
 #include "libsync/account.h"
+#include "libsync/copyparty.h"
 #include "libsync/networkjobs/jsonjob.h"
 
 #include <OAIUser.h>
@@ -51,6 +52,13 @@ FetchServerSettingsJob::FetchServerSettingsJob(const OCC::AccountPtr &account, Q
 
 void FetchServerSettingsJob::start()
 {
+    // copyparty has no OpenCloud capabilities endpoint (ocs/... returns 404)
+    if (Copyparty::isEnabled()) {
+        qCInfo(lcfetchserversettings) << u"copyparty mode: skipping server capabilities fetch";
+        Q_EMIT finishedSignal();
+        return;
+    }
+
     // The main flow now needs the capabilities
     auto *job = new JsonApiJob(_account, QStringLiteral("ocs/v2.php/cloud/capabilities"), {}, {}, this);
     job->setTimeout(fetchSettingsTimeout());
