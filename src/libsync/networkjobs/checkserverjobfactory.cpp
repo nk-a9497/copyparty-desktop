@@ -123,22 +123,14 @@ CoreJob *CheckServerJobFactory::startJob(const QUrl &url, QObject *parent)
         if (job->reply()->error() == QNetworkReply::TooManyRedirectsError) {
             qCWarning(lcCheckServerJob) << u"error:" << job->reply()->errorString();
             setJobError(job, job->reply()->errorString());
-        } else if (copypartyMode && job->reply()->error() == QNetworkReply::NoError) {
-            // copyparty has no /status.php - any HTTP response (even a 404 page) proves
-            // the server is reachable; connection failures still reject below
+        } else if (copypartyMode && job->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid()) {
+            // copyparty has no /status.php - any HTTP response (even a 404/403) proves the server is
+            // reachable; only genuine connection failures (no HTTP response) are rejected below
             qCInfo(lcCheckServerJob) << u"copyparty mode: accepting non-OpenCloud server (HTTP" << httpStatus << u")";
             CheckServerJobResult result(QJsonObject(), serverUrl);
             setJobResult(job, QVariant::fromValue(result));
             return;
         } else if (httpStatus != 200 || job->reply()->bytesAvailable() == 0) {
-            // copyparty has no /status.php, so in copyparty mode any reachable server (2xx/3xx)
-            // passes verification with an empty status object
-            if (copypartyMode && httpStatus >= 200 && httpStatus < 400) {
-                qCInfo(lcCheckServerJob) << u"copyparty mode: accepting non-OpenCloud server (HTTP" << httpStatus << u")";
-                CheckServerJobResult result(QJsonObject(), serverUrl);
-                setJobResult(job, QVariant::fromValue(result));
-                return;
-            }
             qCWarning(lcCheckServerJob) << u"error: status.php replied" << httpStatus;
             setJobError(job, QStringLiteral("Invalid HTTP status code received for status.php: %1").arg(httpStatus));
         } else {
