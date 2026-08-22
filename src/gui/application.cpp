@@ -83,12 +83,9 @@ void setUpInitialSyncFolder(AccountStatePtr accountStatePtr, bool useVfs)
             // we do not want to set up folder sync connections for disabled spaces (#10173)
             spaces.erase(std::remove_if(spaces.begin(), spaces.end(), [](auto *space) { return space->disabled(); }), spaces.end());
 
-            // copyparty: don't auto-create a sync folder for the whole root. The user picks
-            // what to sync (on-demand) instead of forcing a full download of everything.
-            if (Copyparty::isEnabled()) {
-                return;
-            }
-
+            // copyparty: auto-add the (single) space as a sync folder just like OpenCloud
+            // does on connect; with the VFS plugin this creates on-demand placeholders
+            // rather than downloading everything.
             if (!spaces.isEmpty()) {
                 const QString localDir(accountStatePtr->account()->defaultSyncRoot());
                 FileSystem::setFolderMinimumPermissions(localDir);

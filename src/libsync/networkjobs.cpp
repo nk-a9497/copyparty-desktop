@@ -274,7 +274,8 @@ void PropfindJob::finished()
 
     const QString contentType = reply()->header(QNetworkRequest::ContentTypeHeader).toString();
     if (httpStatusCode() == 207) {
-        if (contentType.contains(QLatin1String("application/xml; charset=utf-8"))) {
+        // copyparty returns text/xml instead of application/xml; accept either
+        if (contentType.contains(QLatin1String("application/xml")) || contentType.contains(QLatin1String("text/xml"))) {
             LsColXMLParser parser;
             connect(&parser, &LsColXMLParser::directoryListingSubfolders, this, &PropfindJob::directoryListingSubfolders);
             connect(&parser, &LsColXMLParser::directoryListingIterated, this, &PropfindJob::directoryListingIterated);

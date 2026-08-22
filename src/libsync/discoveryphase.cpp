@@ -258,7 +258,8 @@ void DiscoverySingleDirectoryJob::start()
     QObject::connect(_proFindJob, &PropfindJob::finishedWithError, this, [this] {
         QString msg = _proFindJob->errorString();
         if (_proFindJob->reply()->error() == QNetworkReply::NoError
-            && !_proFindJob->reply()->header(QNetworkRequest::ContentTypeHeader).toString().contains(QLatin1String("application/xml; charset=utf-8"))) {
+            && !_proFindJob->reply()->header(QNetworkRequest::ContentTypeHeader).toString().contains(QLatin1String("application/xml"))
+            && !_proFindJob->reply()->header(QNetworkRequest::ContentTypeHeader).toString().contains(QLatin1String("text/xml"))) {
             msg = tr("Server error: PROPFIND reply is not XML formatted!");
         }
         Q_EMIT finished(HttpError{_proFindJob->httpStatusCode(), msg});
