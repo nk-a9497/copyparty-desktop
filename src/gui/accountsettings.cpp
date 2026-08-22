@@ -383,6 +383,7 @@ void AccountSettings::slotSpacesUpdated()
     const uint64_t syncedSpaces = std::ranges::count_if(
         FolderMan::instance()->folders(), [this](const auto *f) { return f->accountState() == accountsState() && f->space() && !f->space()->disabled(); });
     const auto unsyncedSpaces = enabledSpaces - syncedSpaces;
+    qCInfo(lcAccountSettings) << u"COPPYPARTY spaces count: enabled=" << enabledSpaces << u"synced=" << syncedSpaces;
 
     if (_unsyncedSpaces != unsyncedSpaces) {
         _unsyncedSpaces = unsyncedSpaces;
