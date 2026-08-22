@@ -3,14 +3,16 @@
   <id>@APPLICATION_REV_DOMAIN@.@APPLICATION_EXECUTABLE@</id>
   
   <name>@APPLICATION_NAME@</name>
-  <summary>Desktop client for OpenCloud file synchronization</summary>
+  <summary>Desktop client for copyparty file synchronization</summary>
   
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-2.0+</project_license>
   
   <description>
     <p>
-      The OpenCloud Desktop Client synchronizes files between your computer and OpenCloud. It provides offline access, automatic synchronization, and a consistent way to work with files locally.
+      The copyparty Desktop client synchronizes files between your computer and a copyparty
+      WebDAV server. It provides offline access, on-demand file hydration, and a consistent
+      way to work with files locally.
     </p>
   </description>
   

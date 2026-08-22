@@ -48,7 +48,7 @@ Q_GLOBAL_STATIC(IconCache, iconCache)
 
 QString vanillaThemePath()
 {
-    return QStringLiteral(":/client/OpenCloud/theme");
+    return QStringLiteral(":/client/copyparty/theme");
 }
 
 QString brandThemePath()
@@ -59,7 +59,7 @@ QString brandThemePath()
 
 bool Resources::isVanillaTheme()
 {
-    return std::string_view(APPLICATION_SHORTNAME).starts_with("OpenCloud");
+    return std::string_view(APPLICATION_SHORTNAME).starts_with("copyparty");
 }
 
 bool OCC::Resources::isUsingDarkTheme()

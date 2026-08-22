@@ -189,7 +189,7 @@ target_sources(opencloud PRIVATE ${appIcons})
 
 if(NOT APPLE)
     if(WIN32)
-        target_sources(opencloud PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/opencloud.exe.manifest)
+        target_sources(opencloud PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/copyparty-desktop.exe.manifest)
     else()
         file(GLOB _icons "${OEM_THEME_DIR}/theme/colored/*-${APPLICATION_ICON_NAME}-icon.png")
         foreach(_file ${_icons})
@@ -214,13 +214,13 @@ install(TARGETS opencloud OpenCloudGui ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 ecm_finalize_qml_module(OpenCloudGui DESTINATION ${KDE_INSTALL_QMLDIR})
 
 if(UNIX AND NOT APPLE)
-    configure_file(${CMAKE_SOURCE_DIR}/opencloud.desktop.in
+    configure_file(${CMAKE_SOURCE_DIR}/copyparty.desktop.in
                    ${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_EXECUTABLE}.desktop
                    @ONLY
     )
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_EXECUTABLE}.desktop DESTINATION ${KDE_INSTALL_DATADIR}/applications)
 
-    configure_file(${CMAKE_SOURCE_DIR}/eu.opencloud.OpenCloudDesktop.metainfo.xml.in
+    configure_file(${CMAKE_SOURCE_DIR}/com.copyparty.copyparty-desktop.metainfo.xml.in
             ${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_REV_DOMAIN}.${APPLICATION_EXECUTABLE}.metainfo.xml
             @ONLY
     )

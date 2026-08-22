@@ -322,7 +322,7 @@ CmdOptions parseOptions(const QStringList &app_args)
     parser.addVersionOption();
 
     parser.addPositionalArgument(
-        QStringLiteral("server_url"), QStringLiteral("The URL to the OpenCloud installation on the server. This is usually the root path"));
+        QStringLiteral("server_url"), QStringLiteral("The URL to the copyparty installation on the server. This is usually the root path"));
     parser.addPositionalArgument(QStringLiteral("space_id"),
         QStringLiteral("The id, name or short id of the space to synchronize, if no [space_id] is provided or the [space_id] did not match any space, a list "
                        "of spaces is printed."),
