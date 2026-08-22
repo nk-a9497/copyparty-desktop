@@ -52,32 +52,27 @@ SpacesManager::SpacesManager(Account *parent)
 
 void SpacesManager::refresh()
 {
-    if (!OC_ENSURE(_account->accessManager())) {
-        return;
-    }
-    if (!_account->credentials()->ready()) {
-        return;
-    }
-
+    // copyparty has no spaces / graph API (returns 404). Present the WebDAV root
+    // ("/") as a single syncable space. Do this unconditionally (no network needed).
     if (Copyparty::isEnabled()) {
-        // copyparty has no spaces / graph API (returns 404). Present the WebDAV root
-        // ("/") as a single syncable space.
         constexpr auto rootSpaceId = "copyparty-root";
+        OpenAPI::OAIDrive drive;
+        drive.setId(QLatin1String(rootSpaceId));
+        drive.setName(QStringLiteral("copyparty"));
+        drive.setDriveType(QStringLiteral("project"));
+        OpenAPI::OAIDriveItem root;
+        root.setId(QLatin1String("root"));
+        root.setName(QStringLiteral("copyparty"));
+        root.setWebDavUrl(_account->url().toString());
+        drive.setRoot(root);
+
         auto *space = this->space(QLatin1String(rootSpaceId));
         if (!space) {
-            OpenAPI::OAIDrive drive;
-            drive.setId(QLatin1String(rootSpaceId));
-            drive.setName(QStringLiteral("copyparty"));
-            drive.setDriveType(QStringLiteral("project"));
-            OpenAPI::OAIDriveItem root;
-            root.setId(QLatin1String("root"));
-            root.setName(QStringLiteral("copyparty"));
-            root.setWebDavUrl(_account->url().toString());
-            drive.setRoot(root);
-
             space = new Space(this, drive);
             _spacesMap.insert(QLatin1String(rootSpaceId), space);
             Q_EMIT spaceChanged(space);
+        } else {
+            space->setDrive(drive);
         }
         if (!_ready) {
             _ready = true;
@@ -85,6 +80,13 @@ void SpacesManager::refresh()
         }
         Q_EMIT updated();
         _refreshTimer->start();
+        return;
+    }
+
+    if (!OC_ENSURE(_account->accessManager())) {
+        return;
+    }
+    if (!_account->credentials()->ready()) {
         return;
     }
 
