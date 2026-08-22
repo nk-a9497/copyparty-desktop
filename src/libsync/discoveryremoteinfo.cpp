@@ -4,6 +4,7 @@
 #include "libsync/discoveryremoteinfo.h"
 
 #include "libsync/common/checksums.h"
+#include "libsync/copyparty.h"
 
 #include <QApplication>
 
@@ -62,6 +63,11 @@ public:
         }
         if (_remotePerm.isNull()) {
             errors.append(u"permissions"_s);
+        }
+        // copyparty (plain WebDAV) provides none of etag/id/checksums/permissions
+        // and only coarse modtimes - change detection is size- and presence-based
+        if (Copyparty::isEnabled()) {
+            errors.clear();
         }
         if (!errors.empty()) {
             _error = QApplication::translate("RemoteInfo", "server reported no %1").arg(errors.join(u", "_s));

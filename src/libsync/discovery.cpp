@@ -21,6 +21,7 @@
 
 #include "libsync/common/checksums.h"
 #include "libsync/common/syncjournaldb.h"
+#include "libsync/copyparty.h"
 #include "libsync/filesystem.h"
 
 #include "libsync/theme.h"
@@ -354,7 +355,7 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
             item->setInstruction(CSYNC_INSTRUCTION_SYNC);
             item->_type = ItemTypeVirtualFileDownload;
             item->_size = serverEntry.size();
-        } else if (dbEntry.etag() != serverEntry.etag()) {
+        } else if (dbEntry.etag() != serverEntry.etag() || (Copyparty::isEnabled() && !serverEntry.isDirectory() && dbEntry.size() != serverEntry.size())) {
             item->_direction = SyncFileItem::Down;
             item->_modtime = serverEntry.modtime();
             item->_size = serverEntry.size();
@@ -632,7 +633,13 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
                 item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
                 item->_direction = SyncFileItem::Down;
             }
-        } else if (!typeChange && ((dbEntry.modtime() == localEntry.modtime() && dbEntry.size() == localEntry.size()) || localEntry.isDirectory())) {
+        } else if (!typeChange
+            && ((Copyparty::isEnabled()
+                        // copyparty modtimes are unreliable (coarse, non-deterministic):
+                        // only trust the byte size for local change detection
+                        ? localEntry.size() == dbEntry.size()
+                        : (dbEntry.modtime() == localEntry.modtime() && dbEntry.size() == localEntry.size()))
+                || localEntry.isDirectory())) {
             // Local file unchanged.
             if (noServerEntry) {
                 item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
