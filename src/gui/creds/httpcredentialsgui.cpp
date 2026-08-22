@@ -18,6 +18,7 @@
 #include "accountmodalwidget.h"
 #include "application.h"
 #include "common/asserts.h"
+#include "copyparty.h"
 #include "creds/qmlcredentials.h"
 #include "gui/accountsettings.h"
 #include "networkjobs.h"
@@ -25,6 +26,10 @@
 
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QFormLayout>
+#include <QLineEdit>
 #include <QTimer>
 
 
@@ -49,6 +54,31 @@ HttpCredentialsGui *HttpCredentialsGui::fromBasicAuth(const QString &user, const
 
 void HttpCredentialsGui::restartOauth()
 {
+    if (Copyparty::isEnabled()) {
+        // copyparty has no OAuth - ask for HTTP Basic credentials directly instead
+        qCDebug(lcHttpCredentialsGui) << u"showing modal dialog asking user for HTTP Basic credentials";
+        QDialog dialog(ocApp()->settingsDialog());
+        dialog.setWindowTitle(tr("Login required"));
+        auto *form = new QFormLayout(&dialog);
+        auto *userEdit = new QLineEdit(_user, &dialog);
+        auto *passwordEdit = new QLineEdit(&dialog);
+        passwordEdit->setEchoMode(QLineEdit::Password);
+        form->addRow(tr("Username"), userEdit);
+        form->addRow(tr("Password"), passwordEdit);
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+        QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        form->addRow(buttons);
+        if (dialog.exec() != QDialog::Accepted)
+            return;
+        _user = userEdit->text();
+        _password = passwordEdit->text();
+        _ready = true;
+        persist();
+        Q_EMIT fetched();
+        return;
+    }
+
     qCDebug(lcHttpCredentialsGui) << u"showing modal dialog asking user to log in again via OAuth2";
     if (_asyncAuth) {
         return;

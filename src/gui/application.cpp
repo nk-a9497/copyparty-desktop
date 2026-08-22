@@ -91,7 +91,11 @@ void setUpInitialSyncFolder(AccountStatePtr accountStatePtr, bool useVfs)
                     const QString folderName = FolderMan::instance()->findGoodPathForNewSyncFolder(
                         localDir, name, FolderMan::NewFolderType::SpacesFolder, accountStatePtr->account()->uuid());
                     auto folder = addFolder(folderName, QUrl(space->drive().getRoot().getWebDavUrl()), space->drive().getRoot().getId(), name);
-                    folder->setPriority(space->priority());
+                    if (folder) {
+                        folder->setPriority(space->priority());
+                    } else {
+                        qCWarning(lcApplication) << u"Failed to set up initial sync folder for space" << name << folderName;
+                    }
                 }
                 finalize();
             }

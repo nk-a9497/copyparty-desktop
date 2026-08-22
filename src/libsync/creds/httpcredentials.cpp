@@ -17,6 +17,7 @@
 #include "accessmanager.h"
 #include "account.h"
 #include "configfile.h"
+#include "copyparty.h"
 #include "creds/credentialmanager.h"
 #include "oauth.h"
 #include "syncengine.h"
@@ -140,6 +141,11 @@ void HttpCredentials::fetchFromKeychain()
 
 void HttpCredentials::fetchFromKeychainHelper()
 {
+    if (Copyparty::isEnabled()) {
+        // copyparty has no OAuth; only HTTP Basic credentials are used
+        loadBasicFromKeychain();
+        return;
+    }
     // Prefer OAuth refresh token if present, otherwise fall back to HTTP Basic credentials.
     auto job = _account->credentialManager()->get(refreshTokenKeyC());
     connect(job, &CredentialJob::finished, this, [job, this] {
@@ -217,6 +223,8 @@ void HttpCredentials::slotAuthentication(QNetworkReply *reply, QAuthenticator *a
 
 bool HttpCredentials::refreshAccessToken()
 {
+    if (Copyparty::isEnabled())
+        return false;
     return refreshAccessTokenInternal(0);
 }
 

@@ -15,6 +15,7 @@
 
 #include "accountstate.h"
 #include "account.h"
+#include "libsync/copyparty.h"
 #include "application.h"
 #include "configfile.h"
 #include "fetchserversettings.h"
@@ -470,6 +471,13 @@ void AccountState::slotInvalidCredentials()
         _waitingForNewCredentials = true;
         if (account()->credentials()->ready()) {
             account()->credentials()->invalidateToken();
+        }
+        if (Copyparty::isEnabled()) {
+            // copyparty has no OAuth - prompt for HTTP Basic credentials directly
+            qCInfo(lcAccountState) << u"asking for HTTP Basic credentials";
+            account()->credentials()->restartOauth();
+            setState(Connecting);
+            return;
         }
         if (auto creds = qobject_cast<HttpCredentials *>(account()->credentials())) {
             qCInfo(lcAccountState) << u"refreshing oauth";
