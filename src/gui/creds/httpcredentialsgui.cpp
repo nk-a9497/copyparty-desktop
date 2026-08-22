@@ -38,6 +38,15 @@ HttpCredentialsGui::HttpCredentialsGui(const QString &accessToken, const QString
     _refreshToken = refreshToken;
 }
 
+HttpCredentialsGui *HttpCredentialsGui::fromBasicAuth(const QString &user, const QString &password)
+{
+    auto *creds = new HttpCredentialsGui;
+    creds->_user = user;
+    creds->_password = password;
+    creds->_ready = true;
+    return creds;
+}
+
 void HttpCredentialsGui::restartOauth()
 {
     qCDebug(lcHttpCredentialsGui) << u"showing modal dialog asking user to log in again via OAuth2";

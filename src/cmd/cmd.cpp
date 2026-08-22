@@ -19,6 +19,7 @@
 #include "common/syncjournaldb.h"
 #include "common/version.h"
 #include "configfile.h" // ONLY ACCESS THE STATIC FUNCTIONS!
+#include "libsync/copyparty.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/logger.h"
 #include "libsync/theme.h"
@@ -507,23 +508,9 @@ int main(int argc, char **argv)
 
         QObject::connect(checkServerJob, &CoreJob::finished, qApp, [ctx, checkServerJob] {
             if (checkServerJob->success()) {
-                // Perform a call to get the capabilities.
-                auto *capabilitiesJob = new JsonApiJob(ctx.account, QStringLiteral("ocs/v1.php/cloud/capabilities"), {}, {}, nullptr);
-                QObject::connect(capabilitiesJob, &JsonApiJob::finishedSignal, qApp, [capabilitiesJob, ctx] {
-                    if (capabilitiesJob->reply()->error() != QNetworkReply::NoError || capabilitiesJob->httpStatusCode() != 200) {
-                        qCritical() << u"Error connecting to server";
-                        exit(EXIT_FAILURE);
-                    }
-                    auto caps = capabilitiesJob->data()
-                                    .value(QStringLiteral("ocs"))
-                                    .toObject()
-                                    .value(QStringLiteral("data"))
-                                    .toObject()
-                                    .value(QStringLiteral("capabilities"))
-                                    .toObject();
-                    qDebug() << u"Server capabilities" << caps;
-                    ctx.account->setCapabilities({ctx.account->url(), caps.toVariantMap()});
-
+                // The part that runs once capabilities are known (or are skipped entirely
+                // for copyparty, which has no ocs endpoint).
+                auto finalize = [ctx] {
                     switch (ctx.account->serverSupportLevel()) {
                     case Account::ServerSupportLevel::Supported:
                         break;
@@ -576,6 +563,33 @@ int main(int argc, char **argv)
 
                     // announce we are ready
                     Q_EMIT ctx.account->credentialsFetched();
+                };
+
+                if (Copyparty::isEnabled()) {
+                    // copyparty has no ocs/v1.php/cloud/capabilities endpoint (returns 404)
+                    qDebug() << u"copyparty mode: skipping capabilities fetch";
+                    finalize();
+                    return;
+                }
+
+                // Perform a call to get the capabilities.
+                auto *capabilitiesJob = new JsonApiJob(ctx.account, QStringLiteral("ocs/v1.php/cloud/capabilities"), {}, {}, nullptr);
+                QObject::connect(capabilitiesJob, &JsonApiJob::finishedSignal, qApp, [capabilitiesJob, ctx, finalize] {
+                    if (capabilitiesJob->reply()->error() != QNetworkReply::NoError || capabilitiesJob->httpStatusCode() != 200) {
+                        qCritical() << u"Error connecting to server";
+                        exit(EXIT_FAILURE);
+                    }
+                    auto caps = capabilitiesJob->data()
+                                    .value(QStringLiteral("ocs"))
+                                    .toObject()
+                                    .value(QStringLiteral("data"))
+                                    .toObject()
+                                    .value(QStringLiteral("capabilities"))
+                                    .toObject();
+                    qDebug() << u"Server capabilities" << caps;
+                    ctx.account->setCapabilities({ctx.account->url(), caps.toVariantMap()});
+
+                    finalize();
                 });
                 capabilitiesJob->start();
             } else {

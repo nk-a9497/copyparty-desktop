@@ -35,6 +35,11 @@ public:
 
     HttpCredentialsGui(const QString &accessToken, const QString &refreshToken);
 
+    /**
+     * Create HTTP Basic credentials (used for plain WebDAV servers such as copyparty).
+     */
+    static HttpCredentialsGui *fromBasicAuth(const QString &user, const QString &password);
+
     void restartOauth() override;
 
 

@@ -51,8 +51,21 @@ public:
 
     explicit HttpCredentials(const QString &accessToken);
 
+    /// HTTP Basic auth variant (used for plain WebDAV servers such as copyparty)
+    HttpCredentials(const QString &user, const QString &password);
+
     AccessManager *createAM() const override;
     bool ready() const override;
+
+    /** Whether these credentials are HTTP Basic (plain WebDAV, e.g. copyparty). */
+    bool hasBasicAuth() const;
+
+    /** The Basic-auth username (empty for OAuth credentials). */
+    QString user() const;
+
+    /** The Basic-auth password (empty for OAuth credentials). */
+    QString password() const;
+
     void fetchFromKeychain() override;
     void checkCredentials(QNetworkReply *reply) override;
     void persist() override;
@@ -71,9 +84,14 @@ protected:
     void slotAuthentication(QNetworkReply *reply, QAuthenticator *authenticator);
     void fetchFromKeychainHelper();
 
+    /** Load HTTP Basic (user/password) credentials from the keychain. */
+    void loadBasicFromKeychain();
+
     QString _accessToken;
     QString _refreshToken;
     QString _previousPassword;
+    QString _user;
+    QString _password;
 
     QString _fetchErrorString;
     bool _ready = false;

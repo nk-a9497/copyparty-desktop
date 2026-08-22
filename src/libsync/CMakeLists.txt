@@ -22,11 +22,12 @@ set(libsync_SRCS
     logger.cpp
     accessmanager.cpp
     configfile.cpp
+    copyparty.cpp
     globalconfig.cpp
     abstractnetworkjob.cpp
     networkjobs.cpp
     owncloudpropagator.cpp
-    opencloudtheme.cpp
+    copypartytheme.cpp
     platform.cpp
     progressdispatcher.cpp
     propagatorjobs.cpp

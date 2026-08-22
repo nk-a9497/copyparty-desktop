@@ -1,9 +1,9 @@
-set( APPLICATION_NAME       "OpenCloud Desktop")
-set( APPLICATION_SHORTNAME  "OpenCloud" )
-set( APPLICATION_EXECUTABLE "opencloud" )
-set( APPLICATION_VENDOR     "OpenCloud" )
-set( APPLICATION_ICON_NAME  "opencloud" )
-set( APPLICATION_REV_DOMAIN "eu.opencloud.desktop" )
+set( APPLICATION_NAME       "copyparty Desktop")
+set( APPLICATION_SHORTNAME  "copyparty" )
+set( APPLICATION_EXECUTABLE "copyparty-desktop" )
+set( APPLICATION_VENDOR     "copyparty" )
+set( APPLICATION_ICON_NAME  "copyparty" )
+set( APPLICATION_REV_DOMAIN "com.copyparty.desktop" )
 
 if(BETA_CHANNEL_BUILD)
     set( APPLICATION_NAME       "${APPLICATION_NAME} Beta")
@@ -15,8 +15,8 @@ endif()
 # TODO: re enable once we got icons
 #set( MAC_INSTALLER_BACKGROUND_FILE "${CMAKE_SOURCE_DIR}/admin/osx/installer-background.png")
 
-set( THEME_CLASS            "OpenCloudTheme" )
+set( THEME_CLASS            "CopypartyTheme" )
 
-set( THEME_INCLUDE          "opencloudtheme.h" )
+set( THEME_INCLUDE          "copypartytheme.h" )
 
 option( WITH_CRASHREPORTER "Build crashreporter" OFF )

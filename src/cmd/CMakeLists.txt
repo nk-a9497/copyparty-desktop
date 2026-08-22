@@ -16,6 +16,6 @@ else()
 endif()
 
 if(UNIX AND NOT APPLE)
-    configure_file(${CMAKE_SOURCE_DIR}/opencloud.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_EXECUTABLE}cmd.desktop)
+    configure_file(${CMAKE_SOURCE_DIR}/copyparty.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_EXECUTABLE}cmd.desktop)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_EXECUTABLE}cmd.desktop DESTINATION ${KDE_INSTALL_DATADIR}/applications)
 endif()

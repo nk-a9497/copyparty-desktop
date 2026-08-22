@@ -21,8 +21,8 @@
 
 #include "libsync/common/checksums.h"
 #include "libsync/common/syncjournaldb.h"
+#include "libsync/copyparty.h"
 #include "libsync/filesystem.h"
-
 #include "libsync/theme.h"
 
 #include <algorithm>
@@ -354,7 +354,7 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
             item->setInstruction(CSYNC_INSTRUCTION_SYNC);
             item->_type = ItemTypeVirtualFileDownload;
             item->_size = serverEntry.size();
-        } else if (dbEntry.etag() != serverEntry.etag()) {
+        } else if (dbEntry.etag() != serverEntry.etag() || (Copyparty::isEnabled() && !serverEntry.isDirectory() && dbEntry.size() != serverEntry.size())) {
             item->_direction = SyncFileItem::Down;
             item->_modtime = serverEntry.modtime();
             item->_size = serverEntry.size();
@@ -599,9 +599,15 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
         if (_queryLocal == ParentNotChanged && dbEntry.isValid()) {
             // Not modified locally (ParentNotChanged)
             if (noServerEntry) {
-                // not on the server: Removed on the server, delete locally
-                item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
-                item->_direction = SyncFileItem::Down;
+                if (!Copyparty::isEnabled()) {
+                    // not on the server: Removed on the server, delete locally
+                    item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
+                    item->_direction = SyncFileItem::Down;
+                } else {
+                    // copyparty omits hidden dot-dirs from listings: "not listed" != "deleted".
+                    // Never delete local data based on absence.
+                    item->setInstruction(CSYNC_INSTRUCTION_IGNORE);
+                }
             } else if (dbEntry.type() == ItemTypeVirtualFileDehydration) {
                 // dehydration requested
                 item->_direction = SyncFileItem::Down;
@@ -615,7 +621,9 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
             return;
         } else if (!serverModified) {
             // Removed locally: also remove on the server.
-            if (!dbEntry.serverHasIgnoredFiles()) {
+            // copyparty: don't propagate deletions derived from "not in the listing"
+            // (hidden dot-dirs are omitted), to avoid destroying server data.
+            if (!dbEntry.serverHasIgnoredFiles() && !Copyparty::isEnabled()) {
                 item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
                 item->_direction = SyncFileItem::Up;
             }
@@ -632,14 +640,28 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
         const bool typeChange = localEntry.isDirectory() != dbEntry.isDirectory();
         if (!typeChange && localEntry.isVirtualFile()) {
             if (noServerEntry) {
-                item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
-                item->_direction = SyncFileItem::Down;
+                if (!Copyparty::isEnabled()) {
+                    item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
+                    item->_direction = SyncFileItem::Down;
+                } else {
+                    item->setInstruction(CSYNC_INSTRUCTION_IGNORE);
+                }
             }
-        } else if (!typeChange && ((dbEntry.modtime() == localEntry.modtime() && dbEntry.size() == localEntry.size()) || localEntry.isDirectory())) {
+        } else if (!typeChange
+            && ((Copyparty::isEnabled()
+                        // copyparty modtimes are unreliable (coarse, non-deterministic):
+                        // only trust the byte size for local change detection
+                        ? localEntry.size() == dbEntry.size()
+                        : (dbEntry.modtime() == localEntry.modtime() && dbEntry.size() == localEntry.size()))
+                || localEntry.isDirectory())) {
             // Local file unchanged.
             if (noServerEntry) {
-                item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
-                item->_direction = SyncFileItem::Down;
+                if (!Copyparty::isEnabled()) {
+                    item->setInstruction(CSYNC_INSTRUCTION_REMOVE);
+                    item->_direction = SyncFileItem::Down;
+                } else {
+                    item->setInstruction(CSYNC_INSTRUCTION_IGNORE);
+                }
             } else if (dbEntry.type() == ItemTypeVirtualFileDehydration || localEntry.type() == ItemTypeVirtualFileDehydration) {
                 item->_direction = SyncFileItem::Down;
                 item->setInstruction(CSYNC_INSTRUCTION_SYNC);

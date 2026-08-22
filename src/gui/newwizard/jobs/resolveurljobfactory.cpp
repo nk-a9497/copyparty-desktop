@@ -19,6 +19,7 @@
 #include "gui/settingsdialog.h"
 #include "gui/tlserrordialog.h"
 #include "gui/updateurldialog.h"
+#include "libsync/copyparty.h"
 
 #include <QApplication>
 #include <QNetworkReply>
@@ -52,11 +53,14 @@ CoreJob *ResolveUrlJobFactory::startJob(const QUrl &url, QObject *parent)
                     return;
                 }
 
-                qCCritical(lcResolveUrl) << QStringLiteral("Failed to resolve URL %1, error: %2").arg(oldUrl.toDisplayString(), reply->errorString());
+                // copyparty has no /status.php (returns 404); any HTTP response proves the server is reachable
+                if (!(Copyparty::isEnabled() && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid())) {
+                    qCCritical(lcResolveUrl) << QStringLiteral("Failed to resolve URL %1, error: %2").arg(oldUrl.toDisplayString(), reply->errorString());
 
-                setJobError(job, QApplication::translate("ResolveUrlJobFactory", "Could not detect compatible server at %1").arg(oldUrl.toDisplayString()));
-                qCWarning(lcResolveUrl) << job->errorMessage();
-                return;
+                    setJobError(job, QApplication::translate("ResolveUrlJobFactory", "Could not detect compatible server at %1").arg(oldUrl.toDisplayString()));
+                    qCWarning(lcResolveUrl) << job->errorMessage();
+                    return;
+                }
             }
 
             const auto newUrl = reply->url().adjusted(QUrl::RemoveFilename);

@@ -234,7 +234,7 @@ QString ConfigFile::excludeFile(Scope scope) const
 
 QString ConfigFile::defaultExcludeFile()
 {
-    return QStringLiteral(":/client/OpenCloud/theme/universal/%1").arg(excludeFileNameC());
+    return QStringLiteral(":/client/copyparty/theme/universal/%1").arg(excludeFileNameC());
 }
 
 QString ConfigFile::backup() const

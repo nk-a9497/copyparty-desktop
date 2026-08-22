@@ -18,6 +18,7 @@
 #include "libsync/accessmanager.h"
 #include "libsync/account.h"
 #include "libsync/cookiejar.h"
+#include "libsync/copyparty.h"
 #include "libsync/creds/abstractcredentials.h"
 #include "libsync/theme.h"
 
@@ -118,9 +119,17 @@ CoreJob *CheckServerJobFactory::startJob(const QUrl &url, QObject *parent)
         }
 
         const int httpStatus = job->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const bool copypartyMode = Copyparty::isEnabled();
         if (job->reply()->error() == QNetworkReply::TooManyRedirectsError) {
             qCWarning(lcCheckServerJob) << u"error:" << job->reply()->errorString();
             setJobError(job, job->reply()->errorString());
+        } else if (copypartyMode && job->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid()) {
+            // copyparty has no /status.php - any HTTP response (even a 404/403) proves the server is
+            // reachable; only genuine connection failures (no HTTP response) are rejected below
+            qCInfo(lcCheckServerJob) << u"copyparty mode: accepting non-OpenCloud server (HTTP" << httpStatus << u")";
+            CheckServerJobResult result(QJsonObject(), serverUrl);
+            setJobResult(job, QVariant::fromValue(result));
+            return;
         } else if (httpStatus != 200 || job->reply()->bytesAvailable() == 0) {
             qCWarning(lcCheckServerJob) << u"error: status.php replied" << httpStatus;
             setJobError(job, QStringLiteral("Invalid HTTP status code received for status.php: %1").arg(httpStatus));
@@ -137,6 +146,10 @@ CoreJob *CheckServerJobFactory::startJob(const QUrl &url, QObject *parent)
 
             if (status.object().contains(QStringLiteral("installed"))) {
                 CheckServerJobResult result(status.object(), serverUrl);
+                setJobResult(job, QVariant::fromValue(result));
+            } else if (copypartyMode) {
+                // copyparty has no "installed" status object; accept whatever it replied
+                CheckServerJobResult result(QJsonObject(), serverUrl);
                 setJobResult(job, QVariant::fromValue(result));
             } else {
                 qCWarning(lcCheckServerJob) << u"No proper answer on " << job->reply()->url();
