@@ -41,7 +41,10 @@ ResolveUrlJobFactory::ResolveUrlJobFactory(QNetworkAccessManager *nam)
 
 CoreJob *ResolveUrlJobFactory::startJob(const QUrl &url, QObject *parent)
 {
-    QNetworkRequest req(Utility::concatUrlPath(url, QStringLiteral("status.php")));
+    // copyparty has no /status.php (returns 404/403). Probe the WebDAV root instead,
+    // which copyparty serves with a 200, so it validates as a reachable server.
+    const QUrl probeUrl = Copyparty::isEnabled() ? url : Utility::concatUrlPath(url, QStringLiteral("status.php"));
+    QNetworkRequest req(probeUrl);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
     auto *job = new CoreJob(nam()->get(req), parent);
@@ -53,14 +56,11 @@ CoreJob *ResolveUrlJobFactory::startJob(const QUrl &url, QObject *parent)
                     return;
                 }
 
-                // copyparty has no /status.php (returns 404); any HTTP response proves the server is reachable
-                if (!(Copyparty::isEnabled() && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid())) {
-                    qCCritical(lcResolveUrl) << QStringLiteral("Failed to resolve URL %1, error: %2").arg(oldUrl.toDisplayString(), reply->errorString());
+                qCCritical(lcResolveUrl) << QStringLiteral("Failed to resolve URL %1, error: %2").arg(oldUrl.toDisplayString(), reply->errorString());
 
-                    setJobError(job, QApplication::translate("ResolveUrlJobFactory", "Could not detect compatible server at %1").arg(oldUrl.toDisplayString()));
-                    qCWarning(lcResolveUrl) << job->errorMessage();
-                    return;
-                }
+                setJobError(job, QApplication::translate("ResolveUrlJobFactory", "Could not detect compatible server at %1").arg(oldUrl.toDisplayString()));
+                qCWarning(lcResolveUrl) << job->errorMessage();
+                return;
             }
 
             const auto newUrl = reply->url().adjusted(QUrl::RemoveFilename);
@@ -112,13 +112,6 @@ CoreJob *ResolveUrlJobFactory::startJob(const QUrl &url, QObject *parent)
     QObject::connect(job->reply(), &QNetworkReply::finished, job, makeFinishedHandler(job->reply()));
 
     QObject::connect(job->reply(), &QNetworkReply::sslErrors, job, [req, job, makeFinishedHandler, nam = nam()](const QList<QSslError> &errors) mutable {
-        // copyparty servers commonly use self-signed / untrusted certificates; accept
-        // them so server detection can proceed instead of aborting on the TLS error
-        if (Copyparty::isEnabled()) {
-            job->reply()->ignoreSslErrors(errors);
-            return;
-        }
-
         // the tls error dialog can only handle untrusted certificates not general ssl errors
         auto filtered = errors;
         filtered.erase(std::remove_if(filtered.begin(), filtered.end(), [](const QSslError &e) { return e.certificate().isNull(); }), filtered.end());

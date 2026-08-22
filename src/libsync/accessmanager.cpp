@@ -19,7 +19,6 @@
 #include "accessmanager.h"
 #include "common/utility.h"
 #include "cookiejar.h"
-#include "copyparty.h"
 #include "httplogger.h"
 
 #include <algorithm>
@@ -34,13 +33,6 @@ AccessManager::AccessManager(QObject *parent)
     setCookieJar(new CookieJar);
 
     connect(this, &AccessManager::sslErrors, this, [this](QNetworkReply *reply, const QList<QSslError> &errors) {
-        // copyparty servers commonly use self-signed / untrusted certificates; accept
-        // them so every request through this access manager can reach the server
-        if (Copyparty::isEnabled()) {
-            reply->ignoreSslErrors(errors);
-            return;
-        }
-
         auto filtered = errors;
         filtered.erase(std::remove_if(
                            filtered.begin(), filtered.end(), [this](const QSslError &e) {

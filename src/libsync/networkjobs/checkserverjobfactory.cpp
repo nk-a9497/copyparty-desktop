@@ -83,7 +83,10 @@ CoreJob *CheckServerJobFactory::startJob(const QUrl &url, QObject *parent)
 {
     // the custom job class is used to store some state we need to maintain until the job has finished
 
-    auto req = makeRequest(Utility::concatUrlPath(url, QStringLiteral("status.php")));
+    // copyparty has no /status.php (returns 404/403). Probe the WebDAV root instead,
+    // which copyparty serves with a 200, so it validates as a reachable server.
+    const QUrl probeUrl = Copyparty::isEnabled() ? url : Utility::concatUrlPath(url, QStringLiteral("status.php"));
+    auto req = makeRequest(probeUrl);
 
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     req.setRawHeader(QByteArrayLiteral("OC-Connection-Validator"), QByteArrayLiteral("desktop"));
