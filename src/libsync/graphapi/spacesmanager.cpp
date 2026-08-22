@@ -15,9 +15,12 @@
 #include "spacesmanager.h"
 
 #include "libsync/account.h"
+#include "libsync/copyparty.h"
 #include "libsync/creds/abstractcredentials.h"
 #include "libsync/graphapi/jobs/drives.h"
 
+#include <OAIDrive.h>
+#include <OAIDriveItem.h>
 
 #include <QTimer>
 
@@ -55,6 +58,36 @@ void SpacesManager::refresh()
     if (!_account->credentials()->ready()) {
         return;
     }
+
+    if (Copyparty::isEnabled()) {
+        // copyparty has no spaces / graph API (returns 404). Present the WebDAV root
+        // ("/") as a single syncable space.
+        constexpr auto rootSpaceId = "copyparty-root";
+        auto *space = this->space(QLatin1String(rootSpaceId));
+        if (!space) {
+            OpenAPI::OAIDrive drive;
+            drive.setId(QLatin1String(rootSpaceId));
+            drive.setName(QStringLiteral("copyparty"));
+            drive.setDriveType(QStringLiteral("project"));
+            OpenAPI::OAIDriveItem root;
+            root.setId(QLatin1String("root"));
+            root.setName(QStringLiteral("copyparty"));
+            root.setWebDavUrl(_account->url().toString());
+            drive.setRoot(root);
+
+            space = new Space(this, drive);
+            _spacesMap.insert(QLatin1String(rootSpaceId), space);
+            Q_EMIT spaceChanged(space);
+        }
+        if (!_ready) {
+            _ready = true;
+            Q_EMIT ready();
+        }
+        Q_EMIT updated();
+        _refreshTimer->start();
+        return;
+    }
+
     // TODO: leak the job until we fixed the onwership https://github.com/owncloud/client/issues/11203
     auto drivesJob = new Drives(_account->sharedFromThis(), nullptr);
     drivesJob->setTimeout(refreshTimeoutC);
