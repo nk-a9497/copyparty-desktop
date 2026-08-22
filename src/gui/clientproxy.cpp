@@ -16,9 +16,8 @@
 
 #include "configfile.h"
 #include <QLoggingCategory>
-#include <QNetworkAccessManager>
-#include <QThreadPool>
 #include <QUrl>
+#include <QThreadPool>
 
 namespace OCC {
 
@@ -42,28 +41,6 @@ namespace {
         return proxy;
     }
 
-}
-
-void ClientProxy::applyToAccessManager(QNetworkAccessManager *nam, const QString &password)
-{
-    OCC::ConfigFile cfg;
-    if (!cfg.exists()) {
-        return;
-    }
-    const int proxyType = cfg.proxyType();
-    if (proxyType != QNetworkProxy::HttpProxy && proxyType != QNetworkProxy::Socks5Proxy) {
-        return;
-    }
-    QNetworkProxy proxy;
-    proxy.setType(QNetworkProxy::ProxyType(proxyType));
-    proxy.setHostName(cfg.proxyHostName());
-    proxy.setPort(cfg.proxyPort());
-    if (cfg.proxyNeedsAuth()) {
-        proxy.setUser(cfg.proxyUser());
-        proxy.setPassword(password);
-    }
-    nam->setProxy(proxy);
-    qCInfo(lcClientProxy) << u"Applied proxy to access manager" << printQNetworkProxy(proxy);
 }
 
 QString ClientProxy::printQNetworkProxy(const QNetworkProxy &proxy)

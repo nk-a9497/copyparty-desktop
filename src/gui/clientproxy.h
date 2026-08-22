@@ -20,8 +20,6 @@
 #include <QRunnable>
 #include <QUrl>
 
-class QNetworkAccessManager;
-
 #include "common/utility.h"
 #include "libsync/csync.h"
 
@@ -37,13 +35,6 @@ namespace ClientProxy {
     bool isUsingSystemDefault();
     void lookupSystemProxyAsync(const QUrl &url, QObject *dst, const char *slot);
     void setupQtProxyFromConfig(const QString &password);
-
-    /**
-     * Apply the configured proxy directly to a specific QNetworkAccessManager.
-     * Used e.g. for the setup wizard's access manager so that server detection can
-     * reach the server through the corporate proxy immediately.
-     */
-    void applyToAccessManager(QNetworkAccessManager *nam, const QString &password);
 
     QString printQNetworkProxy(const QNetworkProxy &proxy);
 };

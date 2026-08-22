@@ -13,9 +13,7 @@
  */
 
 #include "setupwizardcontext.h"
-#include "gui/clientproxy.h"
 #include "gui/settingsdialog.h"
-#include "libsync/creds/credentialmanager.h"
 
 namespace OCC::Wizard {
 
@@ -42,20 +40,6 @@ AccessManager *SetupWizardContext::resetAccessManager()
     }
 
     _accessManager = new AccessManager(this);
-
-    // Apply the configured proxy directly so the setup wizard can reach the
-    // copyparty server through the corporate proxy during server detection.
-    {
-        auto *credManager = new CredentialManager(this);
-        auto passwordJob = credManager->get(QStringLiteral("Proxy/Password"));
-        QObject::connect(passwordJob, &CredentialJob::finished, this, [this, credManager, passwordJob] {
-            ClientProxy::applyToAccessManager(_accessManager, passwordJob->data().toString());
-            credManager->deleteLater();
-        });
-        // apply host/port/user immediately so the proxy is active even before the password arrives
-        ClientProxy::applyToAccessManager(_accessManager, QString());
-    }
-
     return _accessManager;
 }
 
