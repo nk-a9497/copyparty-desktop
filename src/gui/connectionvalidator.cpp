@@ -16,10 +16,12 @@
 #include "gui/fetchserversettings.h"
 #include "gui/networkinformation.h"
 #include "libsync/account.h"
+#include "libsync/copyparty.h"
 #include "libsync/creds/abstractcredentials.h"
 #include "libsync/networkjobs.h"
 #include "libsync/networkjobs/checkserverjobfactory.h"
 #include "libsync/networkjobs/jsonjob.h"
+#include "libsync/networkjobs/simplenetworkjob.h"
 #include "libsync/theme.h"
 
 #include <QJsonObject>
@@ -164,6 +166,27 @@ void ConnectionValidator::slotStatusFound(const QUrl &url, const QJsonObject &in
     }
     // now check the authentication
     if (_mode != ConnectionValidator::ValidationMode::ValidateServer) {
+        if (Copyparty::isEnabled()) {
+            // copyparty has no graph API (/graph/v1.0/me returns 404). Validate HTTP
+            // Basic auth with a GET on the WebDAV root instead.
+            auto *webDavJob = new SimpleNetworkJob(_account, _account->url(), QString(), "GET", nullptr);
+            webDavJob->setAuthenticationJob(true);
+            webDavJob->setTimeout(fetchSettingsTimeout());
+            connect(webDavJob, &SimpleNetworkJob::finishedSignal, this, [webDavJob, this] {
+                if (webDavJob->timedOut()) {
+                    reportResult(ConnectionValidator::Timeout);
+                } else if (webDavJob->httpStatusCode() == 200) {
+                    reportResult(ConnectionValidator::Connected);
+                } else if (webDavJob->httpStatusCode() == 401) {
+                    reportResult(ConnectionValidator::CredentialsWrong);
+                } else {
+                    reportResult(ConnectionValidator::Undefined);
+                }
+            });
+            webDavJob->start();
+            return;
+        }
+
         // the endpoint requires authentication
         auto *userJob = new JsonJob(_account, _account->url(), u"graph/v1.0/me"_s, "GET", nullptr);
         userJob->setAuthenticationJob(true);
