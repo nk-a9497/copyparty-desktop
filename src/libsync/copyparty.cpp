@@ -15,7 +15,8 @@ namespace OCC::Copyparty {
 
 bool isEnabled()
 {
-    return qEnvironmentVariableIsSet("OPENCLOUD_COPPYPARTY");
+    // This build is the copyparty client - copyparty behaviour is always on.
+    return true;
 }
 
 QString user()

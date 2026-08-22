@@ -1,11 +1,10 @@
 /*
  * copyparty compatibility helpers.
  *
- * The OpenCloud desktop client can be pointed at a plain copyparty WebDAV
- * server (HTTP Basic auth, no OpenCloud API). To avoid disturbing the default
- * OpenCloud behaviour, all copyparty-specific code paths are gated behind the
- * OPENCLOUD_COPPYPARTY environment variable. Credentials may be supplied via
- * COPPYPARTY_USER / COPPYPARTY_PASS (or entered in the setup wizard).
+ * The OpenCloud desktop client is pointed at a plain copyparty WebDAV server
+ * (HTTP Basic auth, no OpenCloud API). This build is the copyparty client, so
+ * the copyparty-specific code paths are always active. Credentials may be
+ * supplied via COPPYPARTY_USER / COPPYPARTY_PASS (or entered in the wizard).
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +20,7 @@
 
 namespace OCC::Copyparty {
 
-/** Whether copyparty mode is enabled (OPENCLOUD_COPPYPARTY set). */
+/** Whether the copyparty behaviour is active (always true for this build). */
 OPENCLOUD_SYNC_EXPORT bool isEnabled();
 
 /** Username from the COPPYPARTY_USER environment variable (may be empty). */

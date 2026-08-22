@@ -18,6 +18,7 @@
 #include "libsync/accessmanager.h"
 #include "libsync/account.h"
 #include "libsync/cookiejar.h"
+#include "libsync/copyparty.h"
 #include "libsync/creds/abstractcredentials.h"
 #include "libsync/theme.h"
 
@@ -118,7 +119,7 @@ CoreJob *CheckServerJobFactory::startJob(const QUrl &url, QObject *parent)
         }
 
         const int httpStatus = job->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const bool copypartyMode = qEnvironmentVariableIsSet("OPENCLOUD_COPPYPARTY");
+        const bool copypartyMode = Copyparty::isEnabled();
         if (job->reply()->error() == QNetworkReply::TooManyRedirectsError) {
             qCWarning(lcCheckServerJob) << u"error:" << job->reply()->errorString();
             setJobError(job, job->reply()->errorString());
