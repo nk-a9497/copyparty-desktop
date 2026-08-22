@@ -1264,7 +1264,7 @@ DiscoverySingleDirectoryJob *ProcessDirectoryJob::startAsyncServerQuery()
                     return;
                 }
             } else {
-                if (code >= 403) {
+                if (code >= 403 || (Copyparty::isEnabled() && code == 0)) {
                     // In case of an HTTP error, we ignore that directory
                     // 403 Forbidden can be sent by the server if the file firewall is active.
                     // A file or directory should be ignored and sync must continue. See #3490
@@ -1273,6 +1273,8 @@ DiscoverySingleDirectoryJob *ProcessDirectoryJob::startAsyncServerQuery()
                     // is returned too. Thus we can't distinguish the two and will treat any
                     // 503 as request to ignore the folder. See #3113 #2884.
                     // Similarly, the server might also return 404 or 50x in case of bugs. #7199 #7586
+                    // copyparty: transient network errors (code 0) while reading a subdirectory
+                    // must not abort the whole sync - skip that directory and continue.
                     _dirItem->setInstruction(CSYNC_INSTRUCTION_IGNORE);
                     _dirItem->_errorString = results.error().message;
                     Q_EMIT this->finished();

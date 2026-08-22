@@ -18,6 +18,7 @@
 
 #include "account.h"
 #include "accountstate.h"
+#include "libsync/copyparty.h"
 #include "application.h"
 #include "common/depreaction.h"
 #include "common/filesystembase.h"
@@ -220,7 +221,11 @@ SyncOptions Folder::loadSyncOptions()
     opt._moveFilesToTrash = cfgFile.moveToTrash();
     opt._vfs = _vfs;
     // account is currently a shared ptr and thus the lifetime of the account object is guaranteed
-    opt._parallelNetworkJobs = [account = _accountState->account()] { return account->isHttp2Supported() ? 20 : 6; };
+    opt._parallelNetworkJobs = [account = _accountState->account()] {
+        if (Copyparty::isEnabled())
+            return 4; // copyparty servers/proxies stop accepting HTTP/2 streams if we send too many in parallel
+        return account->isHttp2Supported() ? 20 : 6;
+    };
 
     return opt;
 }

@@ -171,7 +171,9 @@ void ConnectionValidator::slotStatusFound(const QUrl &url, const QJsonObject &in
             // Basic auth with a GET on the WebDAV root instead.
             auto *webDavJob = new SimpleNetworkJob(_account, _account->url(), QString(), "GET", nullptr);
             webDavJob->setAuthenticationJob(true);
-            webDavJob->setTimeout(fetchSettingsTimeout());
+            // copyparty discovery can queue a large number of PROPFINDs ahead of this
+            // probe, so allow it much more time than the normal 20s fetch timeout
+            webDavJob->setTimeout(std::chrono::minutes(5));
             connect(webDavJob, &SimpleNetworkJob::finishedSignal, this, [webDavJob, this] {
                 if (webDavJob->timedOut()) {
                     reportResult(ConnectionValidator::Timeout);
