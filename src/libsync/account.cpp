@@ -17,6 +17,7 @@
 #include "capabilities.h"
 #include "common/asserts.h"
 #include "cookiejar.h"
+#include "copyparty.h"
 #include "creds/abstractcredentials.h"
 #include "creds/credentialmanager.h"
 #include "graphapi/spacesmanager.h"
@@ -305,6 +306,11 @@ void Account::setCapabilities(const Capabilities &caps)
 
 Account::ServerSupportLevel Account::serverSupportLevel() const
 {
+    // copyparty has no version/capabilities, but it is a fully supported server for this build
+    if (Copyparty::isEnabled()) {
+        return ServerSupportLevel::Supported;
+    }
+
     if (!hasCapabilities()) {
         // not detected yet, assume it is fine.
         return ServerSupportLevel::Supported;
