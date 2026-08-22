@@ -25,12 +25,14 @@
 #include "folderman.h"
 #include "gui/aboutdialog.h"
 #include "gui/accountsettings.h"
+#include "gui/clientproxy.h"
 #include "gui/fetchserversettings.h"
 #include "gui/folderwizard/folderwizard.h"
 #include "gui/newwizard/setupwizardcontroller.h"
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "gui/systray.h"
+#include "libsync/creds/credentialmanager.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
 #include "resources/fonticon.h"
@@ -135,6 +137,18 @@ Application::Application(const QString &displayLanguage, bool debugMode)
     // The timeout is initialized with an environment variable, if not, override with the value from the config
     if (AbstractNetworkJob::httpTimeout == AbstractNetworkJob::DefaultHttpTimeout) {
         AbstractNetworkJob::httpTimeout = cfg.timeout();
+    }
+
+    // Apply the configured proxy at startup so the setup wizard's server detection
+    // uses it. The wizard runs before the user opens Settings, and on a manual proxy
+    // (host/port/user/password) setup this is the only way it is active during setup.
+    {
+        auto *credManager = new CredentialManager(this);
+        auto proxyPasswordJob = credManager->get(QStringLiteral("Proxy/Password"));
+        QObject::connect(proxyPasswordJob, &CredentialJob::finished, this, [credManager, proxyPasswordJob] {
+            ClientProxy::setupQtProxyFromConfig(proxyPasswordJob->data().toString());
+            credManager->deleteLater();
+        });
     }
 
     qApp->setQuitOnLastWindowClosed(false);
