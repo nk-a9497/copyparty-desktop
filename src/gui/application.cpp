@@ -32,7 +32,6 @@
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "gui/systray.h"
-#include "libsync/copyparty.h"
 #include "libsync/creds/credentialmanager.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
@@ -53,7 +52,6 @@
 #include <QApplication>
 #include <QDesktopServices>
 #include <QMenuBar>
-#include <algorithm>
 
 using namespace Qt::Literals::StringLiterals;
 using namespace OCC;
@@ -80,18 +78,10 @@ void setUpInitialSyncFolder(AccountStatePtr accountStatePtr, bool useVfs)
     QObject::connect(
         accountStatePtr->account()->spacesManager(), &GraphApi::SpacesManager::ready, accountStatePtr,
         [accountStatePtr, addFolder, finalize] {
-            // copyparty auto-add is handled in slotAccountStateAdded (works for restored
-            // accounts too); skip here to avoid double-adding on fresh set-up.
-            if (Copyparty::isEnabled()) {
-                return;
-            }
             auto spaces = accountStatePtr->account()->spacesManager()->spaces();
             // we do not want to set up folder sync connections for disabled spaces (#10173)
             spaces.erase(std::remove_if(spaces.begin(), spaces.end(), [](auto *space) { return space->disabled(); }), spaces.end());
 
-            // copyparty: auto-add the (single) space as a sync folder just like OpenCloud
-            // does on connect; with the VFS plugin this creates on-demand placeholders
-            // rather than downloading everything.
             if (!spaces.isEmpty()) {
                 const QString localDir(accountStatePtr->account()->defaultSyncRoot());
                 FileSystem::setFolderMinimumPermissions(localDir);
@@ -223,49 +213,6 @@ void Application::slotAccountStateAdded(AccountStatePtr accountState) const
     connect(accountState.data(), &AccountState::isConnectedChanged, FolderMan::instance(), &FolderMan::slotIsConnectedChanged);
     connect(accountState->account().data(), &Account::serverVersionChanged, FolderMan::instance(),
         [account = accountState->account().data()] { FolderMan::instance()->slotServerVersionChanged(account); });
-
-    if (Copyparty::isEnabled()) {
-        // copyparty: auto-add the single root space as an on-demand (VFS) folder on connect,
-        // for both new and restored accounts, so it shows up as a syncing card.
-        // OpenCloud only does this for freshly set-up accounts (setUpInitialSyncFolder);
-        // copyparty does it every time to guarantee the card is present.
-        auto addFolder = [accountState](const QString &localFolder, const QUrl &davUrl, const QString &spaceId, const QString &displayName) {
-            auto def = FolderDefinition{accountState->account()->uuid(), davUrl, spaceId, displayName};
-            def.setLocalPath(localFolder);
-            return FolderMan::instance()->addFolderFromWizard(accountState, std::move(def), true);
-        };
-        connect(accountState->account()->spacesManager(), &GraphApi::SpacesManager::ready, accountState.data(),
-            [accountState, addFolder] {
-                auto spaces = accountState->account()->spacesManager()->spaces();
-                spaces.erase(std::remove_if(spaces.begin(), spaces.end(), [](auto *space) { return space->disabled(); }), spaces.end());
-                if (spaces.isEmpty()) {
-                    return;
-                }
-                for (const auto *space : spaces) {
-                    const QString spaceId = space->drive().getRoot().getId();
-                    const QUrl spaceUrl(space->drive().getRoot().getWebDavUrl());
-                    // avoid re-adding a folder that already exists for this space
-                    const bool exists = std::any_of(FolderMan::instance()->folders().cbegin(), FolderMan::instance()->folders().cend(),
-                        [&spaceUrl](const Folder *f) { return f->webDavUrl() == spaceUrl; });
-                    if (exists) {
-                        continue;
-                    }
-                    const QString localDir(accountState->account()->defaultSyncRoot());
-                    FileSystem::setFolderMinimumPermissions(localDir);
-                    Utility::setupFavLink(localDir);
-                    const QString name = space->displayName();
-                    const QString folderName = FolderMan::instance()->findGoodPathForNewSyncFolder(
-                        localDir, name, FolderMan::NewFolderType::SpacesFolder, accountState->account()->uuid());
-                    auto folder = addFolder(folderName, QUrl(space->drive().getRoot().getWebDavUrl()), spaceId, name);
-                    folder->setPriority(space->priority());
-                }
-                FolderMan::instance()->setSyncEnabled(true);
-                FolderMan::instance()->scheduleAllFolders();
-            },
-            Qt::SingleShotConnection);
-        accountState->account()->spacesManager()->checkReady();
-    }
-
     accountState->checkConnectivity();
 }
 

@@ -86,11 +86,6 @@ QUrl SpaceImage::qmlImageUrl() const
 void SpaceImage::update()
 {
     const auto &special = _space->drive().getSpecial();
-    // guard against a null/empty special list (e.g. a synthesized copyparty space)
-    if (special.isEmpty()) {
-        _fetched = true;
-        return;
-    }
     const auto img = std::find_if(special.cbegin(), special.cend(), [](const auto &it) { return it.getSpecialFolder().getName() == QLatin1String("image"); });
     if (img != special.cend()) {
         _fetched = false;
