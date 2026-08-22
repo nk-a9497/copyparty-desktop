@@ -91,7 +91,7 @@ AccountPtr SetupWizardAccountBuilder::build() const
 
     if (hasBasicAuthentication()) {
         // HTTP Basic auth (plain WebDAV, e.g. copyparty) - no OAuth flow
-        auto *creds = new HttpCredentialsGui(_basicUser, _basicPassword);
+        auto *creds = HttpCredentialsGui::fromBasicAuth(_basicUser, _basicPassword);
         newAccountPtr->setCredentials(creds);
         creds->persist();
     } else {
