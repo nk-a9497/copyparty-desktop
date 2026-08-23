@@ -443,67 +443,65 @@ void SyncEngine::startSync()
     _discoveryPhase->_serverBlacklistedFiles = _account->capabilities().blacklistedFiles();
     _discoveryPhase->_ignoreHiddenFiles = ignoreHiddenFiles();
 
+    // Start the recursive discovery job (connect signals + start the root job).
+    auto startDiscovery = [this] {
+        connect(_discoveryPhase.get(), &DiscoveryPhase::itemDiscovered, this, &SyncEngine::slotItemDiscovered);
+        connect(_discoveryPhase.get(), &DiscoveryPhase::fatalError, this, &SyncEngine::abort);
+        connect(_discoveryPhase.get(), &DiscoveryPhase::finished, this, &SyncEngine::slotDiscoveryFinished);
+        connect(_discoveryPhase.get(), &DiscoveryPhase::silentlyExcluded, _syncFileStatusTracker.data(), &SyncFileStatusTracker::slotAddSilentlyExcluded);
+        connect(_discoveryPhase.get(), &DiscoveryPhase::excluded, _syncFileStatusTracker.data(), &SyncFileStatusTracker::slotAddSilentlyExcluded);
+        connect(_discoveryPhase.get(), &DiscoveryPhase::excluded, this, &SyncEngine::excluded);
+        auto discoveryJob = new ProcessDirectoryJob(_discoveryPhase.get(), PinState::AlwaysLocal, _discoveryPhase.get());
+        _discoveryPhase->startJob(discoveryJob);
+        connect(discoveryJob, &ProcessDirectoryJob::etag, this, &SyncEngine::slotRootEtagReceived);
+    };
+
     // copyparty: ask which top-level directories changed (dirrev). A directory whose
     // recursive hash matches the last-seen baseline is guaranteed unchanged, so discovery
     // can skip re-listing it (and its whole subtree) - the no-etag equivalent of
-    // OpenCloud's per-folder etag short-circuit. Falls back to a full discovery if dirrev
-    // is unavailable.
+    // OpenCloud's per-folder etag short-circuit. Done asynchronously so it can never block
+    // the main-thread event loop; falls back to full discovery if dirrev is unavailable.
     if (Copyparty::isEnabled()) {
         _copypartyDirRevCache = std::make_shared<CopypartyDirRevCache>(_account->uuid().toString(QUuid::WithoutBraces));
         _copypartyDirRevCache->load();
 
-        QJsonObject data;
-        {
-            QEventLoop loop;
-            auto *revJob = new JsonJob(_account, _account->url(), QStringLiteral("/.cpr/sync/dirrev"), "GET",
-                SimpleNetworkJob::UrlQuery{{QStringLiteral("path"), QStringLiteral("/")}}, QNetworkRequest{}, nullptr);
-            revJob->setAuthenticationJob(true);
-            revJob->setTimeout(std::chrono::seconds(15));
-            connect(revJob, &JsonJob::finishedSignal, &loop, [&] {
-                data = revJob->data();
-                loop.quit();
-            });
-            QTimer::singleShot(20000, &loop, &QEventLoop::quit);
-            revJob->start();
-            loop.exec();
+        auto *revJob = new JsonJob(_account, _account->url(), QStringLiteral("/.cpr/sync/dirrev"), "GET",
+            SimpleNetworkJob::UrlQuery{{QStringLiteral("path"), QStringLiteral("/")}}, QNetworkRequest{}, this);
+        revJob->setAuthenticationJob(true);
+        revJob->setTimeout(std::chrono::seconds(15));
+        connect(revJob, &JsonJob::finishedSignal, this, [this, revJob, startDiscovery] {
+            const auto data = revJob->data();
             revJob->deleteLater();
-        }
 
-        _copypartyDirRevCache->clearUnchanged();
-        if (data.value(QStringLiteral("ok")).toBool()) {
-            const auto dirs = data.value(QStringLiteral("dirs")).toObject();
-            for (auto it = dirs.constBegin(); it != dirs.constEnd(); ++it) {
-                // dirs[name] = {"rev": N, "files": M, "hash": "<recursive hash>"}
-                const QString hash = it.value().toObject().value(QStringLiteral("hash")).toVariant().toString();
-                if (!_copypartyDirRevCache->baseline(it.key()).isEmpty() && _copypartyDirRevCache->baseline(it.key()) == hash) {
-                    _copypartyDirRevCache->addUnchanged(it.key());
+            _copypartyDirRevCache->clearUnchanged();
+            if (data.value(QStringLiteral("ok")).toBool()) {
+                const auto dirs = data.value(QStringLiteral("dirs")).toObject();
+                for (auto it = dirs.constBegin(); it != dirs.constEnd(); ++it) {
+                    // dirs[name] = {"rev": N, "files": M, "hash": "<recursive hash>"}
+                    const QString hash = it.value().toObject().value(QStringLiteral("hash")).toVariant().toString();
+                    if (!_copypartyDirRevCache->baseline(it.key()).isEmpty() && _copypartyDirRevCache->baseline(it.key()) == hash) {
+                        _copypartyDirRevCache->addUnchanged(it.key());
+                    }
+                    _copypartyDirRevCache->setBaseline(it.key(), hash);
                 }
-                _copypartyDirRevCache->setBaseline(it.key(), hash);
+                qCInfo(lcEngine) << u"copyparty dirrev: skipping unchanged top-level dirs:" << _copypartyDirRevCache->unchangedDirs().size();
+            } else {
+                qCWarning(lcEngine) << u"copyparty dirrev failed, falling back to full discovery";
             }
-            qCInfo(lcEngine) << u"copyparty dirrev: skipping unchanged top-level dirs:" << _copypartyDirRevCache->unchangedDirs().size();
-        } else {
-            qCWarning(lcEngine) << u"copyparty dirrev failed, falling back to full discovery";
-        }
 
-        // The hashes are only persisted on a successful sync (see finalize), so a hash
-        // match here means this directory was previously fully synced and is unchanged -
-        // safe to skip. Incomplete/interrupted subtrees never get a hash, so they are
-        // re-listed and repaired instead of being dropped.
-        _discoveryPhase->_isKnownUnchangedDir = [this](const QString &serverPath) {
-            return _copypartyDirRevCache->isUnchanged(serverPath);
-        };
+            // The hashes are only persisted on a successful sync (see finalize), so a hash
+            // match here means this directory was previously fully synced and is unchanged -
+            // safe to skip. Incomplete/interrupted subtrees never get a hash, so they are
+            // re-listed and repaired instead of being dropped.
+            _discoveryPhase->_isKnownUnchangedDir = [this](const QString &serverPath) {
+                return _copypartyDirRevCache->isUnchanged(serverPath);
+            };
+            startDiscovery();
+        });
+        revJob->start();
+    } else {
+        startDiscovery();
     }
-
-    connect(_discoveryPhase.get(), &DiscoveryPhase::itemDiscovered, this, &SyncEngine::slotItemDiscovered);
-    connect(_discoveryPhase.get(), &DiscoveryPhase::fatalError, this, &SyncEngine::abort);
-    connect(_discoveryPhase.get(), &DiscoveryPhase::finished, this, &SyncEngine::slotDiscoveryFinished);
-    connect(_discoveryPhase.get(), &DiscoveryPhase::silentlyExcluded, _syncFileStatusTracker.data(), &SyncFileStatusTracker::slotAddSilentlyExcluded);
-    connect(_discoveryPhase.get(), &DiscoveryPhase::excluded, _syncFileStatusTracker.data(), &SyncFileStatusTracker::slotAddSilentlyExcluded);
-    connect(_discoveryPhase.get(), &DiscoveryPhase::excluded, this, &SyncEngine::excluded);
-
-    auto discoveryJob = new ProcessDirectoryJob(_discoveryPhase.get(), PinState::AlwaysLocal, _discoveryPhase.get());
-    _discoveryPhase->startJob(discoveryJob);
-    connect(discoveryJob, &ProcessDirectoryJob::etag, this, &SyncEngine::slotRootEtagReceived);
 }
 
 void SyncEngine::slotFolderDiscovered(bool local, const QString &folder)
