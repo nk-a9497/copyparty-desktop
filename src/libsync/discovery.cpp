@@ -39,12 +39,13 @@ void ProcessDirectoryJob::start()
 {
     qCInfo(lcDisco) << u"STARTING" << _currentFolder._server << _queryServer << _currentFolder._local << _queryLocal;
 
-    // copyparty: if dirrev says this directory (and its whole subtree) is unchanged, skip
-    // re-listing it and read its contents from the journal instead of PROPFINDing it.
-    if (Copyparty::isEnabled() && _queryServer == NormalQuery && _discoveryData->_isKnownUnchangedDir
-        && _discoveryData->_isKnownUnchangedDir(_currentFolder._server)) {
-        _queryServer = ParentNotChanged;
-        qCInfo(lcDisco) << u"copyparty dirrev: skipping unchanged directory" << _currentFolder._server;
+    // copyparty has no etags, so every directory is normally treated as unchanged
+    // (ParentNotChanged) and its contents are read from the journal - which is wrong if
+    // the local state is incomplete (files never materialized) or dirrev says it changed.
+    // Consult the guard for every directory: fully-synced + dirrev-unchanged -> skip
+    // (ParentNotChanged, fast); otherwise -> re-list (NormalQuery) so files are created.
+    if (Copyparty::isEnabled() && _discoveryData->_isKnownUnchangedDir) {
+        _queryServer = _discoveryData->_isKnownUnchangedDir(_currentFolder._server) ? ParentNotChanged : NormalQuery;
     }
 
     if (_queryServer == NormalQuery) {
