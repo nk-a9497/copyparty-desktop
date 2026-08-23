@@ -19,6 +19,7 @@
 #include "common/checksums.h"
 #include "common/chronoelapsedtimer.h"
 #include "discoveryphase.h"
+#include "copypartydirrev.h"
 #include "progressdispatcher.h"
 #include "syncfileitem.h"
 #include "syncfilestatustracker.h"
@@ -212,6 +213,7 @@ private:
     SyncJournalDb *_journal;
     std::unique_ptr<DiscoveryPhase> _discoveryPhase;
     QSharedPointer<OwncloudPropagator> _propagator;
+    std::shared_ptr<CopypartyDirRevCache> _copypartyDirRevCache;
 
     // List of all files with conflicts
     QSet<QString> _seenConflictFiles;

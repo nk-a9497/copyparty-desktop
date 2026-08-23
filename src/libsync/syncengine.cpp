@@ -418,12 +418,13 @@ void SyncEngine::startSync()
     _discoveryPhase->_ignoreHiddenFiles = ignoreHiddenFiles();
 
     // copyparty: ask which top-level directories changed (dirrev). A directory whose
-    // revision matches the last-seen baseline is guaranteed unchanged, so discovery can
-    // skip re-listing it (and its whole subtree) - the no-etag equivalent of OpenCloud's
-    // per-folder etag short-circuit. Falls back to a full discovery if dirrev is unavailable.
+    // recursive hash matches the last-seen baseline is guaranteed unchanged, so discovery
+    // can skip re-listing it (and its whole subtree) - the no-etag equivalent of
+    // OpenCloud's per-folder etag short-circuit. Falls back to a full discovery if dirrev
+    // is unavailable.
     if (Copyparty::isEnabled()) {
-        CopypartyDirRevCache cache(_account->uuid().toString(QUuid::WithoutBraces));
-        cache.load();
+        _copypartyDirRevCache = std::make_shared<CopypartyDirRevCache>(_account->uuid().toString(QUuid::WithoutBraces));
+        _copypartyDirRevCache->load();
 
         QJsonObject data;
         {
@@ -442,37 +443,28 @@ void SyncEngine::startSync()
             revJob->deleteLater();
         }
 
-        cache.clearUnchanged();
+        _copypartyDirRevCache->clearUnchanged();
         if (data.value(QStringLiteral("ok")).toBool()) {
             const auto dirs = data.value(QStringLiteral("dirs")).toObject();
             for (auto it = dirs.constBegin(); it != dirs.constEnd(); ++it) {
-                const QString rev = it.value().toVariant().toString();
-                if (!cache.baseline(it.key()).isEmpty() && cache.baseline(it.key()) == rev) {
-                    cache.addUnchanged(it.key());
+                // dirs[name] = {"rev": N, "files": M, "hash": "<recursive hash>"}
+                const QString hash = it.value().toObject().value(QStringLiteral("hash")).toVariant().toString();
+                if (!_copypartyDirRevCache->baseline(it.key()).isEmpty() && _copypartyDirRevCache->baseline(it.key()) == hash) {
+                    _copypartyDirRevCache->addUnchanged(it.key());
                 }
-                cache.setBaseline(it.key(), rev);
+                _copypartyDirRevCache->setBaseline(it.key(), hash);
             }
-            cache.save();
-            qCInfo(lcEngine) << u"copyparty dirrev: skipping unchanged top-level dirs:" << cache.unchangedDirs().size();
+            qCInfo(lcEngine) << u"copyparty dirrev: skipping unchanged top-level dirs:" << _copypartyDirRevCache->unchangedDirs().size();
         } else {
             qCWarning(lcEngine) << u"copyparty dirrev failed, falling back to full discovery";
         }
 
-        _discoveryPhase->_isKnownUnchangedDir = [this, cache](const QString &serverPath) {
-            // Only skip a subtree if dirrev says it's unchanged AND it was fully synced
-            // before. An incomplete local state (e.g. an interrupted first sync that only
-            // recorded directories, or nothing at all) must still be walked so files are
-            // materialized - otherwise we'd silently drop all the files inside.
-            if (!cache.isUnchanged(serverPath)) {
-                return false;
-            }
-            bool hasFiles = false;
-            _journal->getFilesBelowPath(serverPath, [&hasFiles](const SyncJournalFileRecord &rec) {
-                if (!rec.isDirectory()) {
-                    hasFiles = true;
-                }
-            });
-            return hasFiles;
+        // The hashes are only persisted on a successful sync (see finalize), so a hash
+        // match here means this directory was previously fully synced and is unchanged -
+        // safe to skip. Incomplete/interrupted subtrees never get a hash, so they are
+        // re-listed and repaired instead of being dropped.
+        _discoveryPhase->_isKnownUnchangedDir = [this](const QString &serverPath) {
+            return _copypartyDirRevCache->isUnchanged(serverPath);
         };
     }
 
@@ -702,6 +694,13 @@ void SyncEngine::finalize(bool success)
     Q_ASSERT(qApp->thread() == thread());
     qCInfo(lcEngine) << u"Sync run for" << _localPath << u"took" << _duration;
     _duration.stop();
+
+    // Only persist the dirrev hashes after a successful sync. If the sync was aborted or
+    // interrupted, the hashes are left stale so unchanged-but-incomplete subtrees are
+    // re-listed and repaired on the next run instead of being skipped and losing files.
+    if (success && _copypartyDirRevCache) {
+        _copypartyDirRevCache->save();
+    }
 
     if (_discoveryPhase) {
         _discoveryPhase.release()->deleteLater();
