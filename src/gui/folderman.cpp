@@ -19,6 +19,7 @@
 #include "accountstate.h"
 #include "common/asserts.h"
 #include "configfile.h"
+#include "libsync/copyparty.h"
 #include "gui/folder.h"
 #include "gui/folderdefinition.h"
 #include "gui/networkinformation.h"
@@ -292,9 +293,18 @@ void FolderMan::slotIsConnectedChanged()
     if (accountState->isConnected()) {
         qCInfo(lcFolderMan) << u"Account" << accountName << u"connected, scheduling its folders";
 
+        // copyparty has no etags, so a normal sync re-walks the whole tree. That full
+        // walk under load makes the connection probe time out, bouncing the account back
+        // to Disconnected, which re-enters here and re-triggers another full walk. Break
+        // that cycle: after the initial sync (once a changes cursor is stored), don't
+        // re-enqueue on reconnect - CopypartyChangesWatcher drives syncs on real changes.
+        const bool firstSync = Copyparty::isEnabled()
+            && ConfigFile().copypartyChangesCursor(accountState->account()->uuid()).isEmpty();
         for (auto *f : std::as_const(_folders)) {
             if (f->accountState() == accountState && f->canSync()) {
-                scheduler()->enqueueFolder(f);
+                if (!Copyparty::isEnabled() || firstSync) {
+                    scheduler()->enqueueFolder(f);
+                }
             }
         }
     } else if (accountState->state() == AccountState::State::Disconnected || accountState->state() == AccountState::State::SignedOut) {
