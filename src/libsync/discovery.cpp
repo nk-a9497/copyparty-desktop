@@ -1286,6 +1286,7 @@ DiscoverySingleDirectoryJob *ProcessDirectoryJob::startAsyncServerQuery()
                     // must not abort the whole sync - skip that directory and continue.
                     _dirItem->setInstruction(CSYNC_INSTRUCTION_IGNORE);
                     _dirItem->_errorString = results.error().message;
+                    _discoveryData->hadDirectoryErrors = true;
                     Q_EMIT this->finished();
                     return;
                 }

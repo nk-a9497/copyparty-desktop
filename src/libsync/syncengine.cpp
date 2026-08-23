@@ -720,10 +720,11 @@ void SyncEngine::finalize(bool success)
     qCInfo(lcEngine) << u"Sync run for" << _localPath << u"took" << _duration;
     _duration.stop();
 
-    // Only persist the dirrev hashes after a successful sync. If the sync was aborted or
-    // interrupted, the hashes are left stale so unchanged-but-incomplete subtrees are
-    // re-listed and repaired on the next run instead of being skipped and losing files.
-    if (success && _copypartyDirRevCache) {
+    // Only persist the dirrev hashes after a fully successful sync. If the sync was
+    // aborted/interrupted, or any directory was skipped due to an error, the hashes are
+    // left stale so unchanged-but-incomplete subtrees are re-listed and retried on the
+    // next run instead of being skipped and losing files.
+    if (success && _copypartyDirRevCache && (!_discoveryPhase || !_discoveryPhase->hadDirectoryErrors)) {
         _copypartyDirRevCache->save();
     }
 

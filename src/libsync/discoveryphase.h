@@ -207,6 +207,9 @@ public:
     SyncJournalDb *_statedb;
     ExcludedFiles *_excludes;
     QRegularExpression _invalidFilenameRx; // FIXME: maybe move in ExcludedFiles
+    /// copyparty: set when any directory was skipped due to an error (so the sync is
+    /// not considered complete and the dirrev hashes are not persisted, forcing a retry).
+    bool hadDirectoryErrors = false;
     QStringList _serverBlacklistedFiles; // The blacklist from the capabilities
     bool _ignoreHiddenFiles = false;
     std::function<bool(const QString &)> _shouldDiscoverLocaly;
