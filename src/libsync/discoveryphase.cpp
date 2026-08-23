@@ -18,6 +18,7 @@
 #include "account.h"
 #include "common/asserts.h"
 #include "common/checksums.h"
+#include "copyparty.h"
 #include "filesystem.h"
 
 #include <QDateTime>
@@ -25,6 +26,8 @@
 #include <QLoggingCategory>
 #include <QUrl>
 #include <cstring>
+
+using namespace std::chrono_literals;
 
 using namespace Qt::Literals::StringLiterals;
 namespace OCC {
@@ -252,6 +255,12 @@ void DiscoverySingleDirectoryJob::start()
         "http://owncloud.org/ns:permissions"_ba,
         "http://owncloud.org/ns:checksums"_ba,
     });
+    // copyparty: the proxy can drop connections; the 5-minute default timeout would
+    // freeze discovery for minutes when that happens. Use a short timeout so a dropped
+    // PROPFIND is retried quickly and discovery keeps moving.
+    if (Copyparty::isEnabled()) {
+        _proFindJob->setTimeout(30s);
+    }
 
     QObject::connect(_proFindJob, &PropfindJob::directoryListingIterated,
         this, &DiscoverySingleDirectoryJob::directoryListingIteratedSlot);
