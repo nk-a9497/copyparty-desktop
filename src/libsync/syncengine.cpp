@@ -20,11 +20,14 @@
 #include "common/syncjournaldb.h"
 #include "common/syncjournalfilerecord.h"
 #include "configfile.h"
+#include "copyparty.h"
+#include "copypartydirrev.h"
 #include "creds/abstractcredentials.h"
 #include "csync_exclude.h"
 #include "discovery.h"
 #include "discoveryphase.h"
 #include "filesystem.h"
+#include "networkjobs/jsonjob.h"
 #include "owncloudpropagator.h"
 #include "propagatedownload.h"
 #include "vfs/vfs.h"
@@ -32,11 +35,14 @@
 #include <chrono>
 
 #include <QDir>
+#include <QEventLoop>
 #include <QLoggingCategory>
+#include <QNetworkRequest>
 #include <QSslSocket>
 #include <QStringList>
 #include <QTextStream>
 #include <QTime>
+#include <QTimer>
 #include <QUrl>
 
 using namespace std::chrono_literals;
@@ -410,6 +416,54 @@ void SyncEngine::startSync()
     }
     _discoveryPhase->_serverBlacklistedFiles = _account->capabilities().blacklistedFiles();
     _discoveryPhase->_ignoreHiddenFiles = ignoreHiddenFiles();
+
+    // copyparty: ask which top-level directories changed (dirrev). A directory whose
+    // revision matches the last-seen baseline is guaranteed unchanged, so discovery can
+    // skip re-listing it (and its whole subtree) - the no-etag equivalent of OpenCloud's
+    // per-folder etag short-circuit. Falls back to a full discovery if dirrev is unavailable.
+    if (Copyparty::isEnabled()) {
+        CopypartyDirRevCache cache(_account->uuid().toString(QUuid::WithoutBraces));
+        cache.load();
+
+        QJsonObject data;
+        {
+            QEventLoop loop;
+            auto *revJob = new JsonJob(_account, _account->url(), QStringLiteral("/.cpr/sync/dirrev"), "GET",
+                SimpleNetworkJob::UrlQuery{{QStringLiteral("path"), QStringLiteral("/")}}, QNetworkRequest{}, nullptr);
+            revJob->setAuthenticationJob(true);
+            revJob->setTimeout(std::chrono::seconds(15));
+            connect(revJob, &JsonJob::finishedSignal, &loop, [&] {
+                data = revJob->data();
+                loop.quit();
+            });
+            QTimer::singleShot(20000, &loop, &QEventLoop::quit);
+            revJob->start();
+            loop.exec();
+            revJob->deleteLater();
+        }
+
+        cache.clearUnchanged();
+        if (data.value(QStringLiteral("ok")).toBool()) {
+            const auto dirs = data.value(QStringLiteral("dirs")).toObject();
+            for (auto it = dirs.constBegin(); it != dirs.constEnd(); ++it) {
+                const QString rev = it.value().toVariant().toString();
+                if (!cache.baseline(it.key()).isEmpty() && cache.baseline(it.key()) == rev) {
+                    cache.addUnchanged(it.key());
+                }
+                cache.setBaseline(it.key(), rev);
+            }
+            cache.save();
+            qCInfo(lcEngine) << u"copyparty dirrev: skipping unchanged top-level dirs:" << cache.unchangedDirs().size();
+        } else {
+            qCWarning(lcEngine) << u"copyparty dirrev failed, falling back to full discovery";
+        }
+
+        _discoveryPhase->_isKnownUnchangedDir = [this, cache](const QString &serverPath) {
+            // Only skip a subtree if dirrev says it's unchanged AND it was previously
+            // synced (a journal record exists for the directory itself).
+            return cache.isUnchanged(serverPath) && _journal->getFileRecord(serverPath).isValid();
+        };
+    }
 
     connect(_discoveryPhase.get(), &DiscoveryPhase::itemDiscovered, this, &SyncEngine::slotItemDiscovered);
     connect(_discoveryPhase.get(), &DiscoveryPhase::fatalError, this, &SyncEngine::abort);

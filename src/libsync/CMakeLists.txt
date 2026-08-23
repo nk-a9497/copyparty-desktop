@@ -23,6 +23,7 @@ set(libsync_SRCS
     accessmanager.cpp
     configfile.cpp
     copyparty.cpp
+    copypartydirrev.cpp
     globalconfig.cpp
     abstractnetworkjob.cpp
     networkjobs.cpp

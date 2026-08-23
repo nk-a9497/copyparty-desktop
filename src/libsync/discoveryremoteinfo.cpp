@@ -44,6 +44,12 @@ public:
         if (auto it = Utility::optionalFind(map, "id"_L1)) {
             _fileId = it->value().toUtf8();
         }
+        // copyparty provides no file id. cfapi requires a non-empty, stable FileIdentity
+        // to create file placeholders, so synthesize one from the remote path. The same
+        // value is stored in the journal, which is what hydration uses to find the file.
+        if (_fileId.isEmpty() && Copyparty::isEnabled()) {
+            _fileId = fileName.toUtf8();
+        }
         if (auto it = Utility::optionalFind(map, "checksums"_L1)) {
             _checksumHeader = findBestChecksum(it->value().toUtf8());
         }

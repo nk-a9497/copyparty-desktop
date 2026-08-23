@@ -39,6 +39,14 @@ void ProcessDirectoryJob::start()
 {
     qCInfo(lcDisco) << u"STARTING" << _currentFolder._server << _queryServer << _currentFolder._local << _queryLocal;
 
+    // copyparty: if dirrev says this directory (and its whole subtree) is unchanged, skip
+    // re-listing it and read its contents from the journal instead of PROPFINDing it.
+    if (Copyparty::isEnabled() && _queryServer == NormalQuery && _discoveryData->_isKnownUnchangedDir
+        && _discoveryData->_isKnownUnchangedDir(_currentFolder._server)) {
+        _queryServer = ParentNotChanged;
+        qCInfo(lcDisco) << u"copyparty dirrev: skipping unchanged directory" << _currentFolder._server;
+    }
+
     if (_queryServer == NormalQuery) {
         _serverJob = startAsyncServerQuery();
     } else {

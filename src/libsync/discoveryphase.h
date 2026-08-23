@@ -211,6 +211,11 @@ public:
     bool _ignoreHiddenFiles = false;
     std::function<bool(const QString &)> _shouldDiscoverLocaly;
 
+    /** copyparty: called with a remote path; returns true if that directory is known
+     * to be unchanged (per dirrev) and its contents should be read from the journal
+     * instead of re-listed. When set and returning true, discovery skips the subtree. */
+    std::function<bool(const QString &)> _isKnownUnchangedDir;
+
     void startJob(ProcessDirectoryJob *);
 
     void setSelectiveSyncBlackList(const QSet<QString> &list);
