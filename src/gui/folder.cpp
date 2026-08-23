@@ -103,10 +103,17 @@ Folder::Folder(const FolderDefinition &definition, const AccountStatePtr &accoun
         connect(_engine.data(), &SyncEngine::finished, this, &Folder::slotSyncFinished, Qt::DirectConnection);
 
         connect(_engine.data(), &SyncEngine::transmissionProgress, this,
-            [this](const ProgressInfo &pi) { Q_EMIT ProgressDispatcher::instance()->progressInfo(this, pi); });
+            [this](const ProgressInfo &pi) {
+                _lastSyncProgress.restart();
+                Q_EMIT ProgressDispatcher::instance()->progressInfo(this, pi);
+            });
         connect(_engine.data(), &SyncEngine::itemCompleted, this, &Folder::slotItemCompleted);
         connect(_engine.data(), &SyncEngine::seenLockedFile, FolderMan::instance(), &FolderMan::slotSyncOnceFileUnlocks);
         connect(_engine.data(), &SyncEngine::syncError, this, &Folder::slotSyncError);
+
+        // copyparty: watchdog to recover from a stalled sync (no network progress for a while)
+        _syncWatchdog.setInterval(60000);
+        connect(&_syncWatchdog, &QTimer::timeout, this, &Folder::slotSyncWatchdogTimeout);
 
         connect(ProgressDispatcher::instance(), &ProgressDispatcher::folderConflicts,
             this, &Folder::slotFolderConflicts);
@@ -853,6 +860,8 @@ void Folder::startSync()
     _timeSinceLastSyncStart.start();
     _syncResult.reset();
     setSyncState(SyncResult::SyncRunning);
+    _lastSyncProgress.start();
+    _syncWatchdog.start();
 
     qCInfo(lcFolder) << u"*** Start syncing " << displayName() << u"client version" << Theme::instance()->aboutVersions(Theme::VersionFormat::OneLiner);
 
@@ -934,6 +943,7 @@ void Folder::slotSyncFinished(bool success)
         // probably removing the folder
         return;
     }
+    _syncWatchdog.stop();
     qCInfo(lcFolder) << u"Client version" << Theme::instance()->aboutVersions(Theme::VersionFormat::OneLiner);
 
     bool syncError = !_syncResult.errorStrings().isEmpty();
@@ -1005,6 +1015,23 @@ void Folder::slotSyncFinished(bool success)
         // the folder again.
         QTimer::singleShot(10s, this, [this] { FolderMan::instance()->scheduler()->enqueueFolder(this); });
     }
+}
+
+void Folder::slotSyncWatchdogTimeout()
+{
+    // copyparty: if a sync is running but has made no network progress for a long time
+    // (stalled with no requests), abort it and reschedule so it resumes naturally instead
+    // of freezing. The sync's own PROPFINDs reset the progress timer, so an active (even
+    // slow) sync is never aborted.
+    if (!Copyparty::isEnabled() || syncState() != SyncResult::SyncRunning) {
+        return;
+    }
+    if (_lastSyncProgress.elapsed() < std::chrono::minutes(10).count() * 1000) {
+        return;
+    }
+    qCWarning(lcFolder) << u"copyparty sync stalled (no progress for 10 min), aborting and rescheduling" << path();
+    _engine->abort(tr("Sync stalled (no progress for 10 min)"));
+    FolderMan::instance()->scheduler()->enqueueFolder(this, SyncScheduler::Priority::Low);
 }
 
 // a item is completed: count the errors and forward to the ProgressDispatcher

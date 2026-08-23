@@ -272,6 +272,7 @@ public Q_SLOTS:
 
 private Q_SLOTS:
     void slotSyncFinished(bool);
+    void slotSyncWatchdogTimeout();
 
     /** Adds a error message that's not tied to a specific item.
      */
@@ -338,6 +339,10 @@ private:
     QElapsedTimer _timeSinceLastSyncStart;
     QElapsedTimer _timeSinceLastFullLocalDiscovery;
     std::chrono::milliseconds _lastSyncDuration = {};
+
+    // copyparty: watchdog to recover from a stalled sync (no network progress for a while)
+    QElapsedTimer _lastSyncProgress;
+    QTimer _syncWatchdog;
 
     /// The number of syncs that failed in a row.
     /// Reset when a sync is successful.
