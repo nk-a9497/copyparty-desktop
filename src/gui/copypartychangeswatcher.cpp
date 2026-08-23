@@ -14,6 +14,7 @@
 #include "folderman.h"
 #include "libsync/copyparty.h"
 #include "libsync/configfile.h"
+#include "libsync/copypartydirrev.h"
 #include "libsync/networkjobs/jsonjob.h"
 #include "scheduling/syncscheduler.h"
 
@@ -42,11 +43,13 @@ CopypartyChangesWatcher::CopypartyChangesWatcher(AccountStatePtr accountState, Q
     connect(accountState.data(), &AccountState::isConnectedChanged, this, [this] {
         if (_accountState && _accountState->isConnected()) {
             poll();
+            checkDirRev();
         }
     });
 
     if (accountState->isConnected()) {
         poll();
+        checkDirRev();
     }
     _timer.start();
 }
@@ -90,6 +93,45 @@ void CopypartyChangesWatcher::poll()
         if (_useWatch) {
             // keep the long-poll alive: re-issue it immediately
             QTimer::singleShot(0, this, &CopypartyChangesWatcher::poll);
+        }
+    });
+    job->start();
+}
+
+void CopypartyChangesWatcher::checkDirRev()
+{
+    if (!_accountState || !_accountState->isConnected()) {
+        return;
+    }
+    auto *job = new JsonJob(_accountState->account(), _accountState->account()->url(), QStringLiteral("/.cpr/sync/dirrev"), "GET",
+        SimpleNetworkJob::UrlQuery{{QStringLiteral("path"), QStringLiteral("/")}}, QNetworkRequest{}, this);
+    job->setAuthenticationJob(true);
+    job->setTimeout(std::chrono::seconds(15));
+    connect(job, &JsonJob::finishedSignal, this, [this, job] {
+        const auto data = job->data();
+        const bool ok = job->parseError().error == QJsonParseError::NoError && data.value(QStringLiteral("ok")).toBool();
+        job->deleteLater();
+        if (!ok) {
+            return;
+        }
+        // Compare each top-level directory's recursive hash to the hash we last synced.
+        // If any differ (or we have no cached hash - e.g. the last sync never completed),
+        // the local state is out of date/broken, so trigger a sync to repair it.
+        CopypartyDirRevCache cache(_accountState->account()->uuid().toString(QUuid::WithoutBraces));
+        cache.load();
+        bool changed = false;
+        const auto dirs = data.value(QStringLiteral("dirs")).toObject();
+        for (auto it = dirs.constBegin(); it != dirs.constEnd(); ++it) {
+            const QString h = it.value().toObject().value(QStringLiteral("hash")).toVariant().toString();
+            const QString base = cache.baseline(it.key());
+            if (base.isEmpty() || base != h) {
+                changed = true;
+                break;
+            }
+        }
+        if (changed) {
+            qCInfo(lcCopypartyChanges) << u"copyparty dirrev hash differs from local, triggering re-sync";
+            triggerSync();
         }
     });
     job->start();

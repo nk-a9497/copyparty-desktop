@@ -26,6 +26,7 @@ public:
 
 private:
     void poll();
+    void checkDirRev();
     void handleReply(const QJsonObject &data);
     void triggerSync();
 

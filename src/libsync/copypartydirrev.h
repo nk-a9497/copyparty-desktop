@@ -11,13 +11,15 @@
 
 #pragma once
 
+#include "opencloudsynclib.h"
+
 #include <QHash>
 #include <QSet>
 #include <QString>
 
 namespace OCC {
 
-class CopypartyDirRevCache
+class OPENCLOUD_SYNC_EXPORT CopypartyDirRevCache
 {
 public:
     explicit CopypartyDirRevCache(const QString &accountUuid);
