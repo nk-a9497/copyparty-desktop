@@ -459,9 +459,20 @@ void SyncEngine::startSync()
         }
 
         _discoveryPhase->_isKnownUnchangedDir = [this, cache](const QString &serverPath) {
-            // Only skip a subtree if dirrev says it's unchanged AND it was previously
-            // synced (a journal record exists for the directory itself).
-            return cache.isUnchanged(serverPath) && _journal->getFileRecord(serverPath).isValid();
+            // Only skip a subtree if dirrev says it's unchanged AND it was fully synced
+            // before. An incomplete local state (e.g. an interrupted first sync that only
+            // recorded directories, or nothing at all) must still be walked so files are
+            // materialized - otherwise we'd silently drop all the files inside.
+            if (!cache.isUnchanged(serverPath)) {
+                return false;
+            }
+            bool hasFiles = false;
+            _journal->getFilesBelowPath(serverPath, [&hasFiles](const SyncJournalFileRecord &rec) {
+                if (!rec.isDirectory()) {
+                    hasFiles = true;
+                }
+            });
+            return hasFiles;
         };
     }
 
