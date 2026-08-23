@@ -1027,7 +1027,7 @@ void Folder::slotSyncWatchdogTimeout()
     if (!Copyparty::isEnabled() || syncState() != SyncResult::SyncRunning) {
         return;
     }
-    if (_lastSyncProgress.elapsed() < std::chrono::minutes(10).count() * 1000) {
+    if (_lastSyncProgress.elapsed() < 10 * 60 * 1000) { // 10 minutes in ms
         return;
     }
     qCWarning(lcFolder) << u"copyparty sync stalled (no progress for 10 min), aborting and rescheduling" << path();
