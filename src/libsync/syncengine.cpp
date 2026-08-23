@@ -298,16 +298,6 @@ void OCC::SyncEngine::slotItemDiscovered(const OCC::SyncFileItemPtr &item)
     if (item->isDirectory()) {
         slotFolderDiscovered(item->_etag.isEmpty(), item->localName());
     }
-
-    // copyparty: materialize placeholders as discovery walks, so the folder fills in
-    // progressively instead of waiting for the entire (large) discovery pass. This is
-    // best-effort - the normal propagation at the end still creates anything missed.
-    if (Copyparty::isEnabled() && item->instruction() == CSYNC_INSTRUCTION_NEW && item->_direction == SyncFileItem::Down
-        && (item->_type == ItemTypeVirtualFile || item->isDirectory())) {
-        if (auto *vfs = syncOptions()._vfs.data(); vfs && vfs->mode() != Vfs::Off) {
-            vfs->createPlaceholder(*item);
-        }
-    }
 }
 
 void SyncEngine::startSync()
