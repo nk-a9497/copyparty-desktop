@@ -44,6 +44,11 @@
 #include <QTime>
 #include <QTimer>
 #include <QUrl>
+#include <QtConcurrent>
+
+#ifdef Q_OS_WIN
+#include <objbase.h>
+#endif
 
 using namespace std::chrono_literals;
 using namespace Qt::Literals::StringLiterals;
@@ -297,6 +302,27 @@ void OCC::SyncEngine::slotItemDiscovered(const OCC::SyncFileItemPtr &item)
 
     if (item->isDirectory()) {
         slotFolderDiscovered(item->_etag.isEmpty(), item->localName());
+    }
+
+    // copyparty: materialize placeholders progressively as discovery walks, so the folder
+    // fills in instead of waiting for the whole (large) discovery pass. Run on a worker
+    // thread so it never blocks the main-thread network event loop. Best-effort - the
+    // normal propagation at the end still creates anything missed.
+    if (Copyparty::isEnabled() && item->instruction() == CSYNC_INSTRUCTION_NEW && item->_direction == SyncFileItem::Down
+        && (item->_type == ItemTypeVirtualFile || item->isDirectory())) {
+        auto *vfs = syncOptions()._vfs.data();
+        if (vfs && vfs->mode() != Vfs::Off) {
+            QSharedPointer<Vfs> vfsPtr = syncOptions()._vfs;
+            SyncFileItemPtr itemPtr = item;
+            QtConcurrent::run([vfsPtr, itemPtr] {
+                // cfapi needs COM initialized on the calling thread
+                const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+                vfsPtr->createPlaceholder(*itemPtr);
+                if (SUCCEEDED(hr)) {
+                    CoUninitialize();
+                }
+            });
+        }
     }
 }
 
