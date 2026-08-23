@@ -267,6 +267,7 @@ void SyncEngine::conflictRecordMaintenance()
 
 void OCC::SyncEngine::slotItemDiscovered(const OCC::SyncFileItemPtr &item)
 {
+    Q_EMIT syncActivity();
     if (Utility::isConflictFile(item->localName()))
         _seenConflictFiles.insert(item->localName());
     if (item->instruction() == CSYNC_INSTRUCTION_NONE) {

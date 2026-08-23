@@ -141,6 +141,9 @@ Q_SIGNALS:
 
     void transmissionProgress(const ProgressInfo &progress);
 
+    /// Fires on any discovery/propagation activity, so the sync can be detected as alive.
+    void syncActivity();
+
     /// We've produced a new sync error of a type.
     void syncError(const QString &message, ErrorCategory category = ErrorCategory::Normal);
     void excluded(const QString &path);

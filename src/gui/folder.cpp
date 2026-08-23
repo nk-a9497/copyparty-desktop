@@ -110,6 +110,7 @@ Folder::Folder(const FolderDefinition &definition, const AccountStatePtr &accoun
         connect(_engine.data(), &SyncEngine::itemCompleted, this, &Folder::slotItemCompleted);
         connect(_engine.data(), &SyncEngine::seenLockedFile, FolderMan::instance(), &FolderMan::slotSyncOnceFileUnlocks);
         connect(_engine.data(), &SyncEngine::syncError, this, &Folder::slotSyncError);
+        connect(_engine.data(), &SyncEngine::syncActivity, this, [this] { _lastSyncProgress.restart(); });
 
         // copyparty: watchdog to recover from a stalled sync (no network progress for a while)
         _syncWatchdog.setInterval(60000);
