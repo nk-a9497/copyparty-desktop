@@ -64,7 +64,10 @@ void SpacesManager::refresh()
         // copyparty has no spaces / graph API (returns 404). Present the WebDAV root
         // ("/") as a single syncable space.
         constexpr auto rootSpaceId = "copyparty-root";
-        auto *space = this->space(QLatin1String(rootSpaceId));
+        // Space::id() returns the root item id, and folders resolve their space by that
+        // id, so key the space map by the root item id ("root").
+        constexpr auto rootItemId = "root";
+        auto *space = this->space(QLatin1String(rootItemId));
         if (!space) {
             OpenAPI::OAIDrive drive;
             drive.fromJsonObject(QJsonObject{});
@@ -73,13 +76,13 @@ void SpacesManager::refresh()
             drive.setDriveType(QStringLiteral("project"));
             OpenAPI::OAIDriveItem root;
             root.fromJsonObject(QJsonObject{});
-            root.setId(QLatin1String("root"));
+            root.setId(QLatin1String(rootItemId));
             root.setName(QStringLiteral("copyparty"));
             root.setWebDavUrl(_account->url().toString());
             drive.setRoot(root);
 
             space = new Space(this, drive);
-            _spacesMap.insert(QLatin1String(rootSpaceId), space);
+            _spacesMap.insert(QLatin1String(rootItemId), space);
             Q_EMIT spaceChanged(space);
         }
         if (!_ready) {
