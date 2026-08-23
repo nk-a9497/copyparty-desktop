@@ -310,8 +310,15 @@ void FolderMan::slotIsConnectedChanged()
     } else if (accountState->state() == AccountState::State::Disconnected || accountState->state() == AccountState::State::SignedOut) {
         qCInfo(lcFolderMan) << u"Account" << accountName << u"disconnected or paused, terminating or descheduling sync folders";
 
-        if (scheduler()->currentSync() && scheduler()->currentSync()->accountState() == accountState) {
-            scheduler()->terminateCurrentSync(tr("Account disconnected or paused"));
+        auto *cur = scheduler()->currentSync();
+        if (cur && cur->accountState() == accountState) {
+            // copyparty: the sync's own PROPFINDs prove connectivity, so a periodic
+            // connection probe timing out during the (network-heavy) sync must not abort
+            // it - doing so cancels every in-flight placeholder job with 'Operation
+            // canceled' and re-triggers a fresh full walk. Let the sync finish instead.
+            if (!Copyparty::isEnabled()) {
+                scheduler()->terminateCurrentSync(tr("Account disconnected or paused"));
+            }
         }
     }
 }
